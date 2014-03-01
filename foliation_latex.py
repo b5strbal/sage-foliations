@@ -13,6 +13,7 @@ def _tikzcolor(n):
 
 
 
+
 class FoliationLatex(SageObject):
     """
     Options:
@@ -71,13 +72,13 @@ class FoliationLatex(SageObject):
 
     def _tikz_of_separatrix(self, separatrix):
         low_y = -0.5
-        if self._foliation._involution.is_bottom_side_moebius():
+        if self._foliation.is_bottom_side_moebius():
             low_y = -self.get_option('moebius_width')
         else:
             low_y = -0.5
 
         end_x = separatrix.intersections[-1]
-        if separatrix.train_track_path[-1][0] == 0:
+        if separatrix.end_side() == 0:
             end_y = 0.5
         else:
             end_y = low_y
@@ -91,6 +92,18 @@ class FoliationLatex(SageObject):
             x = separatrix.intersections[i]
             s += '\\draw[color=separatrixcolor, {opt}] ({0},{1}) -- ({0},0.5);\n'.format(x, low_y, opt = draw_options)
         return s
+
+
+#    def _tikz_of_train_track(self, train_track):
+#        s = ''
+#        for position in self._foliation.involution.positions():
+#            s += '\\node ({name}) at ({x}, {y}) {}\n'.format(
+#                    name = str(pair[0]) + '_' + str(pair[1]),
+#                    x = 
+
+
+
+
 
 
 
@@ -114,9 +127,6 @@ class FoliationLatex(SageObject):
         interval_labelling = self.get_option('interval_labelling')
         length_labelling = self.get_option('length_labelling')
 
-        involution = self._foliation._involution
-        divvalues = self._foliation._divvalues
-
         latex.add_to_preamble('\usepackage{tikz}\n')
         s = '\\begin{{tikzpicture}}[scale = {0},'\
             'font=\\tiny]\n'.format(scale_size)
@@ -125,77 +135,75 @@ class FoliationLatex(SageObject):
         lines = ''
         fillings = ''
         labels = ''
-        pos = 'above'
-        for i in {0,1}:
-            if i == 1:
+        if self._foliation.is_bottom_side_moebius():
+            moebius_width = self.get_option('moebius_width')
+            lines += '\\draw (0,-{0}) [dotted] -- (1,-{0});\n'.format(\
+                    moebius_width) 
+            fillings += '\\fill[yellow!{cs}!white] (0,0) rectangle '\
+                    '(1,-{0});\n'.format(moebius_width, 
+                            cs = color_strength / 2)
+            labels += '\\node[font = \large] at (0.5, -0.1) '\
+                    '{Moebius band};\n'
+
+        for interval in self._foliation.intervals():
+            if interval.side == 0:
+                pos = 'above'
+            else:
                 pos = 'below'
-            if i == 1 and involution.is_bottom_side_moebius():
-                moebius_width = self.get_option('moebius_width')
-                lines += '\\draw (0,-{0}) [dotted] -- (1,-{0});\n'.format(\
-                        moebius_width) 
-                fillings += '\\fill[yellow!{cs}!white] (0,0) rectangle '\
-                        '(1,-{0});\n'.format(moebius_width, 
-                                cs = color_strength / 2)
-                labels += '\\node[font = \large] at (0.5, -0.1) '\
-                        '{Moebius band};\n'
-                break
-            for j in range(len(divvalues[i])):
-                begin_percent = color_strength
-                end_percent = 0
+            begin_percent = color_strength
+            end_percent = 0
 
-                signed_letter = letter = involution[i][j]
-                if involution.is_flipped((i,j)):
-                    signed_letter = '-' + letter
-                    if (i, j) > involution.pair((i,j)):
-                        begin_percent, end_percent = end_percent, begin_percent
+            signed_label = interval.label()
+            if interval.is_flipped():
+                signed_label = '-' + signed_label
+                if interval > interval.pair():
+                    begin_percent, end_percent = end_percent, begin_percent
 
-                x1 = divvalues[i][j]
-                x2 = divvalues[i][j] + \
-                        self._foliation._lengths[letter].value
-                midx = (x1 + x2)/2
-                y = (-1)**i*0.5
-                p1 = '({0},0)'.format(x1)
-                p2 = '({0},{1})'.format(x1, y)
-                p3 = '({0},{1})'.format(x2, y)
-                p4 = '({0},0)'.format(x2)
+            x1 = interval.endpoint(0)
+            x2 = interval.endpoint(1)
+            if x2 == 0:
+                x2 = 1
+            midx = interval.midpoint()
+            y = (-1)**interval.side * 0.5
+            p1 = '({0},0)'.format(x1)
+            p2 = '({0},{1})'.format(x1, y)
+            p3 = '({0},{1})'.format(x2, y)
+            p4 = '({0},0)'.format(x2)
 
-                color = _tikzcolor(involution.index(letter))
+            color = _tikzcolor(self._foliation.index_of_label(
+                interval.label()))
 
-                lines += '\\draw {0} -- {1};\n'.format(p1, p2)
-                if i == 0 or j < len(divvalues[i]) - 1:
-                    lines += '\\draw[dashed] {0} -- {1};\n'.format(p2, p3)
-                    fillings += '\\shade[left color = {0}!{bp}!white, '\
-                            'right color = {0}!{ep}!white] {1} rectangle '\
-                            '{2};\n'.format(color, p1, p3, 
-                                    bp = begin_percent, ep = end_percent)
-                else:
-                    p3 = '({0},{1})'.format(x2 - 1, y)
-                    if x2 - 1 > 1 - x1:
-                        midx -= 1
-                    lines += '\\draw[dashed] {0} -- {1};\n'.format(p2, 
-                        '(1,-0.5)')
-                    lines += '\\draw[dashed] {0} -- {1};\n'.format(
-                            '(0,-0.5)', p3)
-                    middle_percent = color_strength * (x2 - 1) / (x2 - x1)
-                    fillings += '\\shade[left color = {0}!{bp}!white, '\
-                            'right color = {0}!{mp}!white] {1} rectangle '\
-                            '{2};\n'.format(color, p1, '(1,-0.5)', 
-                                    mp = middle_percent, bp = begin_percent)
-                    fillings += '\\shade[left color = {0}!{mp}!white, '\
-                            'right color = {0}!{ep}!white] {1} rectangle '\
-                            '{2};\n'.format(color, '(0,0)', p3, 
-                                    mp = middle_percent, ep = end_percent)
+            lines += '\\draw {0} -- {1};\n'.format(p1, p2)
+            if x1 < x2:
+                lines += '\\draw[dashed] {0} -- {1};\n'.format(p2, p3)
+                fillings += '\\shade[left color = {0}!{bp}!white, '\
+                        'right color = {0}!{ep}!white] {1} rectangle '\
+                        '{2};\n'.format(color, p1, p3, 
+                                bp = begin_percent, ep = end_percent)
+            else:
+                lines += '\\draw[dashed] {0} -- {1};\n'.format(p2, 
+                    '(1,-0.5)')
+                lines += '\\draw[dashed] {0} -- {1};\n'.format(
+                        '(0,-0.5)', p3)
+                middle_percent = color_strength * (x2) / (1 + x2 - x1)
+                fillings += '\\shade[left color = {0}!{bp}!white, '\
+                        'right color = {0}!{mp}!white] {1} rectangle '\
+                        '{2};\n'.format(color, p1, '(1,-0.5)', 
+                                mp = middle_percent, bp = begin_percent)
+                fillings += '\\shade[left color = {0}!{mp}!white, '\
+                        'right color = {0}!{ep}!white] {1} rectangle '\
+                        '{2};\n'.format(color, '(0,0)', p3, 
+                                mp = middle_percent, ep = end_percent)
 
-                sing_color = _tikzcolor(involution.\
-                        which_singularity((i,j)))
-                singularities += '\\filldraw[fill={col}, draw = black] {0} '\
-                        'circle (0.005);\n'.format(p2, col = sing_color)
-                if length_labelling:
-                    labels += '\\node at ({0},0) [{1}] {{{2}}};\n'.\
-                            format(midx, pos, signed_letter)
-                if interval_labelling:
-                    labels += '\\node at ({0},{1}) [{2}] {{{3}}};\n'.\
-                            format(midx, y, pos, round(x2 - x1, 4))
+            sing_color = _tikzcolor(interval.which_singularity())
+            singularities += '\\filldraw[fill={col}, draw = black] {0} '\
+                    'circle (0.005);\n'.format(p2, col = sing_color)
+            if length_labelling:
+                labels += '\\node at ({0},0) [{1}] {{{2}}};\n'.\
+                        format(midx, pos, signed_label)
+            if interval_labelling:
+                labels += '\\node at ({0},{1}) [{2}] {{{3}}};\n'.\
+                        format(midx, y, pos, round(interval.length(), 4))
 
         lines += '\\draw (1,0) -- (1,0.5);\n'\
                 '\\draw[very thick] (0,0) -- (1,0);\n'
