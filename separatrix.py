@@ -1,5 +1,5 @@
 class Separatrix(SageObject):
-    def __init__(self, foliation, interval, bounding_arc = None,
+    def __init__(self, foliation, interval, end = 0, bounding_arc = None,
            number_of_flips_to_stop = None):
         r"""
         Calculates the segment of a separatrix before first intersecting
@@ -72,9 +72,10 @@ class Separatrix(SageObject):
         assert(not foliation.is_bottom_side_moebius() or 
                 interval.side == 0) # otherwise it is not a real separatrix
         self._flip_count = 0
-        self._intersections = [interval.endpoint(0)] 
+        self._intersections = [interval.endpoint(end)] 
         self._traversed_intervals = [interval]
         self._foliation = foliation
+        self._first_interval_end = end
 
         if bounding_arc == None:
             assert(len(foliation.flips()) > 0 or number_of_flips_to_stop == 0)
@@ -95,16 +96,46 @@ class Separatrix(SageObject):
     def traversed_intervals(self):
         return self._traversed_intervals
 
+    @property
+    def foliation(self):
+        return self._foliation
+
     def end_side(self):
         return self.traversed_intervals[-1].side
+    
+    def endpoint(self):
+        return self._intersections[-1]
+
+    def first_interval(self):
+        return self._traversed_intervals[0]
+
+    def first_interval_end(self):
+        return self._first_interval_end
 
     def is_flipped(self):
         return self._flip_count % 2 == 1
 
+    @classmethod
+    def get_all(cls, foliation, bounding_arc = None,
+                number_of_flips_to_stop = None):
+        return [Separatrix(foliation, interval, 0, bounding_arc,
+                           number_of_flips_to_stop) for
+                interval in foliation.intervals()]
+
+    @classmethod
+    def sorted_separatrices(cls, separatrices, starting_point = 0):
+        return [sorted([s for s in separatrices if 
+                        s.end_side() == side],
+                       key = lambda s: mod_one(s.endpoint() -
+                                               starting_point))
+                for side in {0, 1}]
+        
+                
+
     def _interval_on_other_side(self):
         return self._foliation.in_which_interval(\
                 self._intersections[-1], (self.end_side() + 1) % 2)
-
+                
     def _lengthen(self):
         self._traversed_intervals.append(self._interval_on_other_side())
         if self._traversed_intervals[-1].is_flipped():
@@ -137,4 +168,5 @@ class Separatrix(SageObject):
 
     def _latex_(self):
         from foliation_latex import FoliationLatex
-        return FoliationLatex(f).tikz_picture([self])
+        return FoliationLatex(self._foliation).tikz_picture(
+            separatrices = [self])

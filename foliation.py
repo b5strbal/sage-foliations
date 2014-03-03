@@ -335,256 +335,6 @@ def arnoux_yoccoz_factor(genus, field = RDF):
 
 
 
-class Arc(SageObject):
-    """
-    An interval of the unit interval $[0,1]$ with opposite sides 
-    identified.
-
-    INPUT:
-
-    - ``left_endpoint`` - PointWithCoefficients
-    - ``right_endpoint`` - PointWithCoefficients
-    - ``left_openness`` - 'closed' or 'open'. The default is 'closed'
-    - ``right_openness`` - 'closed' or 'open'. The default is 'open'
-
-    EXAMPLES:
-
-    Any usual interval can be specified::
-
-        sage: from sage.dynamics.foliations.foliation import Arc, PointWithCoefficients
-        sage: Arc(PointWithCoefficients(1/2, [2, 1]), \
-                PointWithCoefficients(3/5, [4, -1]))
-        [(1/2, (2, 1)), (3/5, (4, -1)))
-        sage: Arc(PointWithCoefficients(0, [0]), \
-                PointWithCoefficients(0.4, [1]), 'open', 'closed')
-        ((0, (0)), (0.400000000000000, (1))]
-        
-    But intervals wrapping around the endpoints are also considered::
-
-        sage: Arc(PointWithCoefficients(1/2, [0, 1]), \
-                PointWithCoefficients(1/4, [1, -2]),'closed','closed')
-        [(1/2, (0, 1)), (1/4, (1, -2))]
-
-    One can get the endpoints by indexing and the length() using the 
-    length()::
-
-        sage: i = Arc(PointWithCoefficients(1/5, (1, 2)), \
-                PointWithCoefficients(4/7, (6, -1)))
-        sage: i[0]
-        (1/5, (1, 2))
-        sage: i[1]
-        (4/7, (6, -1))
-        sage: i.length()
-        (13/35, (5, -3))
-
-        sage: j = Arc(PointWithCoefficients(1/2, [0, 1]), \
-                PointWithCoefficients(1/4, [1, -2]),'closed','closed')
-        sage: j.length()
-        (3/4, (2, -3))
-    
-    """
-    def __init__(self, left_endpoint, right_endpoint,
-            left_openness = 'closed', right_openness = 'open'):
-        if not 0 <= left_endpoint < 1 or not \
-                0 <= right_endpoint < 1:
-                    raise ValueError("The endpoints of the Arc "
-                            "must be between 0 and 1.")
-        self._lep = left_endpoint
-        self._rep = right_endpoint
-        if not {'closed', 'open'} >= {left_openness, right_openness}:
-            raise ValueError('Openness arguments should be either '
-                    '\'closed\' or \'open\'')
-        self._left_openness = left_openness
-        self._right_openness = right_openness
-
-    @staticmethod
-    def _less(x, y, is_equality_allowed):
-        """
-        Unifies the < and <= operators in a single function.
-
-        INPUT:
-
-        - ``x`` - a number
-        - ``y`` - another number
-        - ``is_equality_allowed`` - if True, the function returns 
-          x<=y, otherwise x<y
-
-        TESTS::
-
-            sage: from sage.dynamics.foliations.foliation import Arc
-            sage: Arc._less(1, 2, True)
-            True
-            sage: Arc._less(2, 1, True)
-            False
-            sage: Arc._less(1, 1, True)
-            True
-            sage: Arc._less(1, 1, False)
-            False
-
-        """
-        if is_equality_allowed:
-            return x <= y
-        else:
-            return x < y
-
-    def _repr_(self):
-        """
-        Returns the representation of self.
-
-        TESTS::
-
-        sage: from sage.dynamics.foliations.foliation import Arc, PointWithCoefficients
-        sage: Arc(PointWithCoefficients(1/2, [0, 1]), \
-                PointWithCoefficients(1/4, [1, -2]),'closed','closed')
-        [(1/2, (0, 1)), (1/4, (1, -2))]
-
-        """
-        s = ''
-        if self._left_openness == 'closed':
-            s += '['
-        else:
-            s += '('
-        s += str(self._lep) + ', ' + str(self._rep)
-        if self._right_openness == 'closed':
-            s += ']'
-        else:
-            s += ')'
-        return s
-
-    def __getitem__(self, index):
-        """
-        Returns the left or right endpoint of the interval.
-
-        INPUT:
-
-        - ``index`` - either 0 or 1, for the left and right endpoints
-          respectively
-
-        OUTPUT:
-
-        - PointWithCoefficients - one of the endpoints
-
-        EXAMPLES::
-
-            sage: from sage.dynamics.foliations.foliation import Arc, PointWithCoefficients
-            sage: i = Arc(PointWithCoefficients(1/5, (1, 2)), \
-                    PointWithCoefficients(4/7, (6, -1)))
-            sage: i[0]
-            (1/5, (1, 2))
-            sage: i[1]
-            (4/7, (6, -1))
-
-        """
-        if index == 0:
-            return self._lep
-        if index == 1:
-            return self._rep
-
-    def length(self):
-        """
-        Returns the length of the interval.
-
-        OUTPUT:
-
-        - PointWithCoefficients - the length of the interval
-
-        EXMAPLES::
-
-            sage: from sage.dynamics.foliations.foliation import Arc, PointWithCoefficients
-            sage: i = Arc(PointWithCoefficients(1/5, (1, 2)), \
-                    PointWithCoefficients(4/7, (6, -1)))
-            sage: i.length()
-            (13/35, (5, -3))
-
-            sage: j = Arc(PointWithCoefficients(0.5, [0, 1]), \
-                PointWithCoefficients(0.25,[1, -2]),'closed','closed')
-            sage: j.length()
-            (0.750000000000000, (2, -3))
-    
-        """
-        return mod_one(self[1] - self[0])
-        #return (self._rep - self._lep).mod_one()
-
-    def contains(self, point):
-        """
-        Decides if a point in contained in self.
-
-        The cooefficients of the point don't matter, only the value.
-
-        INPUT:
-
-        - ``point`` - PointWithCoefficients or a real number, 
-            must be in the unit interval $[0, 1)$ 
-
-        OUTPUT:
-
-        - boolean - True if ``point`` is contained in self,
-          False if not
-
-        EXAMPLES::
-
-            sage: from sage.dynamics.foliations.foliation import Arc, PointWithCoefficients
-            sage: i = Arc(PointWithCoefficients(0.25, [0, 1]), \
-                PointWithCoefficients(0.5,[1, -2]),'open','closed')
-            sage: i.contains(PointWithCoefficients(0.1, [1,1]))
-            False
-            sage: i.contains(PointWithCoefficients(0.3, [-2,6]))
-            True
-            sage: i.contains(PointWithCoefficients(0.25, [-1,5]))
-            False
-            sage: i.contains(0.25)
-            False
-            sage: i.contains(PointWithCoefficients(0.5, [1,7]))
-            True
-            sage: i.contains(0.5)
-            True
-
-            sage: j = Arc(PointWithCoefficients(0.5, [0, 1]), \
-                PointWithCoefficients(0.25,[1, -2]),'closed','open')
-            sage: j.contains(PointWithCoefficients(0.1, [1,1]))
-            True
-            sage: j.contains(PointWithCoefficients(0.3, [-2,6]))
-            False
-            sage: j.contains(PointWithCoefficients(0.25, [-1,5]))
-            False
-            sage: j.contains(PointWithCoefficients(0.5, [1,7]))
-            True
-
-            sage: k = Arc(PointWithCoefficients(0.3, (1,1)),\
-                    PointWithCoefficients(0.3, (1,1)))
-            sage: k.contains(PointWithCoefficients(0.3, (1,1)))
-            False
-
-            sage: l = Arc(PointWithCoefficients(0.3, (1,1)),\
-                    PointWithCoefficients(0.3, (1,1)), 'closed', \
-                    'closed')
-            sage: l.contains(PointWithCoefficients(0.3, (1,1)))
-            True
-
-        """
-        if not 0 <= point < 1:
-            raise ValueError("Only points in the unit interval can be"
-                    " tested for containment")
-        if self[0] <= self[1]:
-            if self._less(self[0], point, 
-                    is_equality_allowed = (self._left_openness == 
-                        'closed')) and\
-                    self._less(point, self[1], 
-                            is_equality_allowed = 
-                            (self._right_openness == 'closed')):
-                return True
-            else:
-                return False
-        if self._less(self[1], point, 
-                is_equality_allowed = 
-                (self._right_openness == 'open')) and\
-                self._less(point, self[0], 
-                    is_equality_allowed =
-                        (self._left_openness == 'open')):
-            return False
-        else:
-            return True
-
 
 class SaddleConnectionError(Exception):
     pass
@@ -1039,6 +789,10 @@ class Foliation(SageObject):
 
         def length(self):
             return self._foliation._lengths[self.label()]
+
+        def is_wrapping(self):
+            return self.endpoint(0) > self.endpoint(1)
+
 
         def is_flipped(self):
             """
@@ -1785,62 +1539,6 @@ class Foliation(SageObject):
     def reversed(self):
         return self.new_foliation(self._reverse_data())
 
-    def _get_involution(self, sorted_distances, is_lift):
-        done = set()
-        flips = set()
-        if is_lift:
-            remaining_letters = \
-                    range((len(sorted_distances[0]) + 
-                        len(sorted_distances[1]))/2, 0, -1)
-        else:
-            remaining_letters = self._involution.alphabet()
-        inv_list = [[0] * len(sorted_distances[i]) for i in {0,1}]
-        for side in {0, 1}:
-            for i in range(len(sorted_distances[side])):
-                if (side, i) in done:
-                    continue
-                letter = remaining_letters.pop()
-                on_the_right = True
-                d = sorted_distances[side][i]
-                new_side = d.orig_side
-                new_i = d.orig_pos
-                if d.is_flipped: #orintation is reversed
-                    on_the_right = False
-                    new_i = (new_i - 1) % \
-                            len(self._involution[new_side])
-                (new_side, new_i) = self._involution.pair(\
-                        (new_side, new_i))
-                if self._involution.is_flipped(new_side, new_i):
-                    on_the_right = not on_the_right
-                if not on_the_right:
-                    new_i = (new_i + 1) % \
-                            len(self._involution[new_side])
-                (new_side, new_i) = next((a, b) for a in {0, 1}
-                        for b in range(len(sorted_distances[a]))
-                        if (sorted_distances[a][b].orig_side,
-                        sorted_distances[a][b].orig_pos) == 
-                        (new_side, new_i) and (not is_lift or 
-                            sorted_distances[a][b].is_flipped !=
-                            on_the_right))
-                if sorted_distances[new_side][new_i].is_flipped:
-                    on_the_right = not on_the_right
-                if not on_the_right:
-                    new_i = (new_i - 1) % \
-                            len(sorted_distances[new_side])
-                inv_list[side][i] = inv_list[new_side][new_i] = \
-                        letter
-                done.add((side, i)); done.add((new_side, new_i))
-                if not on_the_right:
-                    flips.add(letter)
-        if inv_list[1] == []:
-            del inv_list[1]
-        return Involution(*inv_list, flips = flips)
-
-    @staticmethod
-    def _get_sorted_distances(distances):
-        return [sorted([x for x in distances if 
-            x.side == side], key = lambda s: s.distance.value)
-                for side in {0, 1}]
 
        
     def _create_transition_data(self, intervals, total, 
@@ -1879,6 +1577,62 @@ class Foliation(SageObject):
         return self.TransitionData(tr_matrix = m,
                 new_inv = new_involution)
 
+    @classmethod
+    def from_separatrices(cls, separatrices, arc_length = 1, is_lift = False):
+        foliation = separatrices[0][0].foliation
+        done = set()
+        flips = set()
+        remaining_labels = range((len(separatrices[0]) +
+                                  len(separatrices[1]))/2, 0, -1)
+        gen_perm = [[0] * len(separatrices[i]) for i in range(2)]
+        lengths = {}
+        for side in range(2):
+            for i in range(len(separatrices[side])):
+                if (side, i) in done:
+                    continue
+                label = remaining_labels.pop()
+                end = 0 # traces which end of the current interval we are
+                s = separatrices[side][i]
+                interval = s.first_interval()
+                if s.is_flipped():
+                    interval = interval.prev()
+                    end = 1
+                interval = interval.pair()
+                if interval.is_flipped():
+                    end = (end + 1) % 2
+                if end == 1:
+                    interval = interval.next()
+                (new_side, new_i) = next((side, j) for side in range(2)
+                                         for j in range(len(separatrices[side]))
+                                         if interval == separatrices[side][j].first_interval() and
+                                         (not is_lift or separatrices[side][j].is_flipped()
+                                          == (end==1)))
+                
+                if separatrices[new_side][new_i].is_flipped():
+                    end = (end + 1) % 2
+                if end == 1:
+                    new_i = (new_i - 1) % len(separatrices[new_side])
+                    flips.add(label)
+                gen_perm[side][i] = gen_perm[new_side][new_i] = label
+                done.add((side, i))
+                done.add((new_side, new_i))
+            
+                s1 = separatrices[side][i]
+                s2 = separatrices[side][(i+1)%len(separatrices[side])]
+                lengths[label] = mod_one(s2.endpoint() - s1.endpoint())
+                if s1.end_side() < s2.end_side():
+                    lengths[label] -= 1 - arc_length
+    
+        if gen_perm[1] == []:
+            gen_perm[1] = 'moebius'
+            twist = None
+        else:
+            twist = mod_one(separatrices[1][0].endpoint() -
+                            separatrices[0][0].endpoint())
+        return Foliation(*gen_perm, lengths, flips = flips, twist = twist)
+
+
+
     def foliation_orientable_double_cover(self):
         """
         Returns the orienting double cover of the foliation.
@@ -1914,45 +1668,20 @@ class Foliation(SageObject):
         as many division points for the lift foliation as for the
         original one.
 
-
-
-
         """
         if self.is_foliation_orientable():
             return self
-        flipped_intersections = self._get_intersections()
-        distances = []
-        for side in range(2):
-            n = len(self._divpoints[side])
-            for pos in range(n):
-                if self._involution[side][pos] == self._involution\
-                        [side][(pos - 1) % n] and self._involution.\
-                        is_flipped((side, pos)):
-                            continue
-                distances.append(self.DistanceData(side = side,
-                    distance = self._divpoints[side][pos],
-                    is_flipped = False,
-                    orig_side = side,
-                    orig_pos = pos))
-                int_data = flipped_intersections[side][pos]
-                distances.append(self.DistanceData(side = int_data.\
-                        side,
-                        distance = int_data.point,
-                        is_flipped = True,
-                        orig_side = side,
-                        orig_pos = pos))
-        sorted_distances = self._get_sorted_distances(distances)
-
-        new_involution = self._get_involution(sorted_distances,
-                is_lift = True)
-
-
-        lengths = {new_involution[side][pos] :(sorted_distances[side]\
-                [(pos + 1) % len(sorted_distances[side])].distance -
-                sorted_distances[side][pos].distance).mod_one().value
-                for side in range(2) for pos in 
-                range(len(sorted_distances[side]))}
-        return Foliation(new_involution, lengths)
+        separatrices = []
+        
+        for interval in self.intervals():
+            if interval.is_flipped() and interval.prev() == interval:
+                continue
+            for i in range(2):
+                separatrices.append(Separatrix(self, interval,
+                                               number_of_flips_to_stop=i))
+            
+        return Foliation.from_separatrices(Separatrix.sorted_separatrices(
+            separatrices), is_lift = True)
  
 
     def surface_orientable_double_cover(self):

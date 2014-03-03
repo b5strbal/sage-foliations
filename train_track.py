@@ -57,6 +57,16 @@ class TrainTrack(DiGraph):
                     separatrix.traversed_intervals[1], 'center',
                     crossing = separatrix.intersections[0])
 
+    def _latex_(self):
+        r"""
+        Returns the LaTeX/TikZ representaion of the train track.
+        
+        """
+        from foliation_latex import FoliationLatex
+        return FoliationLatex(self._foliation).tikz_picture(
+            train_tracks = [self])
+        
+
     class Path:
         def __init__(self, oriented_edges):
             self._path = oriented_edges
