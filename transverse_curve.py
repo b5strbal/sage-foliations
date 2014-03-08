@@ -309,7 +309,7 @@ class TransverseCurve(SageObject):
             separatrices[0].extend(separatrices[1])
             separatrices[1] = []
                 
-        return new_foliation(separatrices, self._arc.length())
+        return Foliation.from_separatrix(separatrices, self._arc.length())
 
     @classmethod
     def find_transverse_curves(cls, interval, end,

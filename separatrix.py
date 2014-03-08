@@ -1,6 +1,7 @@
 class Separatrix(SageObject):
     def __init__(self, foliation, interval, end = 0, bounding_arc = None,
-           number_of_flips_to_stop = None):
+                 number_of_flips_to_stop = None,
+                 stop_at_first_orientation_reverse = False):
         r"""
         Calculates the segment of a separatrix before first intersecting
         a set of intervals.
@@ -78,14 +79,18 @@ class Separatrix(SageObject):
         self._first_interval_end = end
 
         if bounding_arc == None:
-            assert(len(foliation.flips()) > 0 or number_of_flips_to_stop == 0)
-            def terminate(p):
-                return self._flip_count == number_of_flips_to_stop
+            if number_of_flips_to_stop > 0:
+                assert(len(foliation.flips()) > 0)
+                def terminate():
+                    return self._flip_count == number_of_flips_to_stop
+            elif stop_at_first_orientation_reverse:
+                def terminate():
+                    return self.is_orienation_reversing()
         else:
-            def terminate(p):
-                return bounding_arc.contains(p)
+            def terminate():
+                return bounding_arc.contains(self._intersections[-1])
 
-        while not terminate(self._intersections[-1]):
+        while not terminate():
             self._lengthen()
 
     @property
@@ -99,6 +104,11 @@ class Separatrix(SageObject):
     @property
     def foliation(self):
         return self._foliation
+
+    def is_orienation_reversing(self):
+        return (self.end_side == self._traversed_intervals[0].side)\
+            != self.is_flipped()
+        
 
     def end_side(self):
         return self.traversed_intervals[-1].side

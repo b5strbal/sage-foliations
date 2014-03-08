@@ -793,6 +793,8 @@ class Foliation(SageObject):
         def is_wrapping(self):
             return self.endpoint(0) > self.endpoint(1)
 
+        def is_orienation_reversing(self):
+            return self.is_flipped() != (self.pair().side == self.side)
 
         def is_flipped(self):
             """
@@ -887,7 +889,7 @@ class Foliation(SageObject):
               or bottom interval. The second coordinate is the
               index of the interval in that row.
             
-            OUTPUT:
+v            OUTPUT:
 
             - integer - the index of the specified singularity. 
 
@@ -999,7 +1001,7 @@ class Foliation(SageObject):
         s.discard('JOKER')
         return s
 
-    def is_foliation_orientable(self):
+    def is_orientable(self, foliation_or_surface):
         """
         Decides if the suspension foliations are orientable.
 
@@ -1022,11 +1024,6 @@ class Foliation(SageObject):
             sage: i.is_foliation_orientable()
             True
 
-        """
-        return len(self.flips()) == 0
-
-    def is_surface_orientable(self):
-        """
         Decides if the suspension surface is orientable.
 
         OUTPUT:
@@ -1060,13 +1057,13 @@ class Foliation(SageObject):
             sage: i.is_surface_orientable()
             True
 
-        """ 
-        for interval in flatten(self._all_intervals):
-            cond1 = (interval.side == interval.pair().side)
-            cond2 = interval.is_flipped()
-            if cond1 != cond2:
-                return False
-        return True
+        """
+        if foliation_or_surface == 'surface':
+            return len(self.flips()) == 0)
+        if foliation_or_surface == 'foliation':
+            return all(!i.is_orienation_reversing() for i in
+                       self.intervals())
+
 
     def singularity_partition(self):
         """
@@ -1417,168 +1414,9 @@ class Foliation(SageObject):
             return (mod_one(new_int.endpoint(1) - diff), new_int)
 
 
-    def _rotated_gen_perm(self, top_rotation, bottom_rotation):
-        """
-        Returns an involution where the top and bottom rows
-        are rotated cyclically.
-
-        INPUT:
-
-        - ``top`` - an integer, shift the top letters
-          cyclically by this amount
-
-        - ``bottom`` - an integer, shift the bottom letters
-          cyclically by this amount
-
-        OUTPUT:
-
-        - Involution - the rotated Involution
-
-        EXAMPLES::
-
-            sage: i = Involution('a b c b','c a d d', \
-                    flips='bc');i
-            a -b -c -b
-            -c a d d
-            sage: i.rotated(1, 1)
-            -b a -b -c
-            d -c a d
-            sage: i.rotated(-6, 2)
-            -c -b a -b
-            d d -c a
-            
-        """
-        from collections import deque
-        labels = [deque(self.labels()[side]) for side in {0, 1}]
-        rotations = (top_rotation, bottom_rotation)
-        for side in {0, 1}:
-            labels[side].rotate(rotations[side])
-        return GeneralizedPermutation(list(labels[0]), list(labels[1]), 
-                flips = self.flips())
-
-    def _reversed_gen_perm(self):
-        """
-        Returns an involution where the top and bottom rows
-        are reversed.
-
-        OUTPUT:
-
-        - Involution - the reversed Involution
-
-        EXAMPLES::
-
-            sage: i = Involution('a b c b','c a d d', \
-                    flips='bc');i
-            a -b -c -b
-            -c a d d
-            sage: i.reversed()
-            -b -c -b a
-            d d a -c
-
-        """
-        from collections import deque
-        labels = [deque(self.labels()[side]) for side in {0, 1}]
-        for side in {0, 1}:
-            labels[side].reverse()
-        return GeneralizedPermutation(list(labels[0]), list(labels[1]), 
-                flips = self.flips())
-
-
-
-
-
-
-
-
-    DistanceData = namedtuple('DistanceData', 'side, distance, '
-            'is_flipped, orig_side, orig_pos')
-
-    TransitionData = namedtuple('TransitionData', 'tr_matrix,new_inv')
-
-    def new_foliation(self, transition_data):
-        new_vector = transition_data.tr_matrix * self._length_twist_vector 
-        if self._involution.is_bottom_side_moebius():
-            return Foliation(transition_data.new_inv, 
-                new_vector.list())
-        else:
-            return Foliation(transition_data.new_inv, 
-                new_vector[:-1].list(), new_vector[-1])
-
-    def _simple_transformation_data(self, new_involution, 
-            twist_row = None):
-        m = matrix(self._num_coeffs)
-        for letter in self._involution.alphabet():
-            m[new_involution.index(letter),
-                    self._involution.index(letter)] = 1
-        if not self._involution.is_bottom_side_moebius():
-            m[-1] = twist_row
-        return self.TransitionData(tr_matrix = m, 
-                new_inv = new_involution)
-
-
-    def _rotation_data(self, k):
-        n = len(self._divpoints[0])
-        k = k % n
-        twist_row = [0] * self._num_coeffs
-        twist_row[-1] = 1
-        for i in range(k):
-            twist_row[self._involution.index(\
-                    self._involution[0][n - 1 - i])] += 1
-        return self._simple_transformation_data(\
-                self._involution.rotated(k, 0),
-                twist_row = twist_row)
-
-    def _reverse_data(self):
-        return self._simple_transformation_data(\
-                self._involution.reversed(),
-                twist_row = [0] * (self._num_coeffs - 1) + [-1])
-
-    def rotated(self, k):
-        return self.new_foliation(self._rotation_data(k))
-
-    def reversed(self):
-        return self.new_foliation(self._reverse_data())
-
-
-       
-    def _create_transition_data(self, intervals, total, 
-            distance_getter):
-        intersections = self._get_intersections(intervals)
-
-        distances = [distance_getter(intersections, 
-            side, pos) for side in {0, 1}
-            for pos in range(len(intersections[side]))]
-
-        sorted_distances = self._get_sorted_distances(distances)
-        new_involution = self._get_involution(sorted_distances,
-                is_lift = False)
-        #print intersections
-        #print distances
-        #print sorted_distances
-
-        m = matrix(self._num_coeffs)
-        done = set()
-        for side in {0,1}:
-            for i in range(len(sorted_distances[side])):
-                letter = new_involution[side][i]
-                if letter in done:
-                    continue
-                diff = sorted_distances[side][(i + 1) % 
-                        len(sorted_distances[side])].distance -\
-                                sorted_distances[side][i].distance
-                if diff.value < 0:
-                    diff += total
-                m[len(done)] = diff.coefficients
-                done.add(letter)
-        if len(sorted_distances[1]) != 0:
-            m[-1] = sorted_distances[1][0].distance.coefficients -\
-                    sorted_distances[0][0].distance.coefficients
-
-        return self.TransitionData(tr_matrix = m,
-                new_inv = new_involution)
 
     @classmethod
-    def from_separatrices(cls, separatrices, arc_length = 1, is_lift = False):
+    def from_separatrices(cls, separatrices, arc_length = 1, lift_type = None):
         foliation = separatrices[0][0].foliation
         done = set()
         flips = set()
@@ -1602,12 +1440,11 @@ class Foliation(SageObject):
                     end = (end + 1) % 2
                 if end == 1:
                     interval = interval.next()
-                (new_side, new_i) = next((side, j) for side in range(2)
-                                         for j in range(len(separatrices[side]))
-                                         if interval == separatrices[side][j].first_interval() and
-                                         (not is_lift or separatrices[side][j].is_flipped()
-                                          == (end==1)))
-                
+                new_side, new_i = self._matching_sep_index(separatrices,
+                                                           interval,
+                                                           lift_type,
+                                                           end, side)
+
                 if separatrices[new_side][new_i].is_flipped():
                     end = (end + 1) % 2
                 if end == 1:
@@ -1631,9 +1468,23 @@ class Foliation(SageObject):
                             separatrices[0][0].endpoint())
         return Foliation(*gen_perm, lengths, flips = flips, twist = twist)
 
+    @staticmethod
+    def _matching_sep_index(separatrices, interval, lift_type, end, orig_side):
+        for side in range(2):
+            for j in range(len(separatrices[side])):
+                s = separatrices[side][j]
+                is_total_flipped = (s.is_flipped() != (end==1))
+                if s.first_interval() == interval:
+                    if lift_type == None or \
+                       lift_type == 'foliaion' and is_total_flipped or \
+                       lift_type == 'surface' and \
+                       (s.end_side == orig_side) != is_total_flipped:
+                        return (side, j)
+        assert(False)
 
 
-    def foliation_orientable_double_cover(self):
+
+    def double_cover(self, foliation_or_surface):
         """
         Returns the orienting double cover of the foliation.
 
@@ -1668,24 +1519,6 @@ class Foliation(SageObject):
         as many division points for the lift foliation as for the
         original one.
 
-        """
-        if self.is_foliation_orientable():
-            return self
-        separatrices = []
-        
-        for interval in self.intervals():
-            if interval.is_flipped() and interval.prev() == interval:
-                continue
-            for i in range(2):
-                separatrices.append(Separatrix(self, interval,
-                                               number_of_flips_to_stop=i))
-            
-        return Foliation.from_separatrices(Separatrix.sorted_separatrices(
-            separatrices), is_lift = True)
- 
-
-    def surface_orientable_double_cover(self):
-        """
         Returns the double cover of the foliation that orients the
         surface.
 
@@ -1735,287 +1568,18 @@ class Foliation(SageObject):
             sage: f.surface_orientable_double_cover() == g
             True
         """
-        if self._involution.is_surface_orientable():
+
+        if self.is_orientable(foliation_or_surface):
             return self
-        assert(self._involution.is_bottom_side_moebius())
-        n = len(self._divpoints[0])
-        alphabet = range(n, 0, -1)
-        inv_list = [[0] * n for i in range(2)]
-        done = set()
-        flips = set()
-        lengths = {}
-        for i in range(n):
-            if i in done:
-                continue
-            j = self._involution.pair((0, i))[1]
-            letter = alphabet.pop()
-            letter2 = alphabet.pop()
-            lengths[letter] = lengths[letter2] = \
-                    self._lengths[self._involution[0][i]].value
-            if self._involution.is_flipped((0, i)):
-                inv_list[0][i] = inv_list[0][j] = letter
-                inv_list[1][i] = inv_list[1][j] = letter2
-                flips.add(letter)
-                flips.add(letter2)
-            else:
-                inv_list[0][i] = inv_list[1][j] = letter
-                inv_list[0][j] = inv_list[1][i] = letter2
-            done.add(i); done.add(j)
-        return Foliation(Involution(*inv_list, flips = flips), 
-                lengths, twist = Rational('1/2'))
+        separatrices = Separatrix.get_all(self, number_of_flips_to_stop=0)
+        if foliation_or_surface == 'foliation':
+            separatrices += Separatrix.get_all(self, number_of_flips_to_stop=1)
+        elif foliation_or_surface == 'surface':
+            separatrices += Separatrix.get_all(self,
+                                        stop_at_first_orientation_reverse=True)
 
-
-
-    def _check_not_flipped(self, side, pos):
-        if self._involution.is_flipped(side, pos):
-            raise RestrictionError('The specified interval should '
-                    'not be flipped, but it is.')
-
-    def _check_flipped(self, side, pos):
-        if not self._involution.is_flipped(side, pos):
-            raise RestrictionError('The specified interval '
-                    'should be flipped, but it isn\'t.')
-
-    def _check_same_side(self, side, pos):
-        if self._involution.pair((side, pos))[0] != side:
-            raise RestrictionError('The interval pair should '
-                    'be on the same same side, but it isn\'t.')
-
-    def _check_different_side(self, side, pos):
-        if self._involution.pair((side, pos))[0] == side:
-            raise RestrictionError('The interval pair should '
-                    'be on different sides, but it isn\'t.')
-
-    def _assert_different_pair(self, side1, pos1, side2, pos2):
-        if (side1, pos1) in {(side2, pos2),
-                self._involution.pair((side2, pos2))}:
-            raise RestrictionError('The chosen pairs should be '
-                    'different, but they are not.')
-
-    def _get_intersections(self, intervals = None):
-        return [[self._first_intersection(side, pos, 
-            intervals = intervals)
-                for pos in range(len(self._divpoints[side]))]
-                for side in {0,1}]
-
-    def _get_right_endpoint(self, side, pos):
-        return self._divpoints[side][(pos + 1) %
-                len(self._divpoints[side])]
-
-    def _get_left_endpoint(self, side, pos):
-        return self._divpoints[side][pos]
-
-
-    def _restrict_not_flipped_same_side(self, side, pos):
-        self._check_not_flipped(side, pos)
-        self._check_same_side(side, pos)
-        #n = len(self._divpoints[side])
-        left_endpoint = self._get_right_endpoint(side, pos)
-        side2, pos2 = self._involution.pair((side, pos))
-        right_endpoint = self._get_right_endpoint(side2, pos2)
-
-        interval = Arc(left_endpoint, right_endpoint)
-        total = interval.length()
-
-        def get_distance_data(intersections, side, pos):
-            int_data = intersections[side][pos]
-            distance = (int_data.point - left_endpoint).mod_one()
-            if int_data.side == 1:
-                distance += total
-            return self.DistanceData(side = 0,
-                distance = distance,
-                is_flipped = int_data.is_flipped,
-                orig_side = side,
-                orig_pos = pos) 
-
-        return self._create_transition_data([interval], total + total,
-                get_distance_data)
-
-
-    def _restrict_not_flipped_different_side(self, side, pos):
-        self._check_not_flipped(side, pos)
-        self._check_different_side(side, pos)
+        return Foliation.from_separatrices(Separatrix.sorted_separatrices(
+            separatrices), lift_type = foliation_or_surface)
         
-        left_endpoint = self._get_right_endpoint(side, pos)
-        side2, pos2 = self._involution.pair((side, pair))
-        right_endpoint = self._get_right_endpoint(side2, pos2)
 
-        interval = Arc(left_endpoint, right_endpoint)
-
-        total = interval.length()
-
-        def get_distance_data(intersections, side, pos):
-            int_data = intersections[side][pos]
-            return self.DistanceData(side = int_data.side,
-                distance = (int_data.point -left_endpoint).mod_one(),
-                is_flipped = int_data.is_flipped,
-                orig_side = side,
-                orig_pos = pos)
-
-        return self._create_transition_data([interval], total)
-
-           
-    def _restrict_flipped_two_sided(self, side1, pos1,
-            side2, pos2):
-        self._assert_different_pair(side1, pos1, side2, pos2)
-
-        Endpoint = namedtuple('Endpoint', 
-                'point, end, is_closed, side')
-
-        ints =[[(side1, pos1),
-            self._involution.pair((side1, pos1))], [(side2, pos2), 
-                self._involution.pair((side2, pos2))]]
-        endpoints = []
-        for i in {0,1}:
-            self._check_flipped(*ints[i][0])
-            endpoints.extend([Endpoint(point=self._get_left_endpoint(\
-                    *ints[i][0]),end = 'left', is_closed = (i == 1), 
-                    side = ints[i][0][0]), 
-                    Endpoint(\
-                    point = self._get_right_endpoint(*ints[i][1]),
-                    end = 'right', is_closed = (i == 1),
-                    side = ints[i][1][0])])
-
-        endpoints.sort(key = lambda x: x.point.value)
-        while endpoints[0].end == 'right' or\
-                endpoints[1].end == 'left':
-                    endpoints = endpoints[-1:] + endpoints[:-1]
-
-
-        def create_interval(i, j):
-            return Arc(endpoints[i].point,
-                endpoints[j].point,
-                left_openness = endpoints[i].is_closed,
-                right_openness = endpoints[j].is_closed)
-
-
-        if endpoints[1].end == 'right':
-            intervals = [create_interval(0, 1), create_interval(2, 3)]
-        else:
-            if endpoints[1].side == endpoints[2].side:
-                interval1 = create_interval(1, 2)
-                interval2 = create_interval(0, 3)
-            else:
-                interval2 = create_interval(0, 2)
-                interval1 = create_interval(1, 3)
-            if endpoints[1].side == 0:
-                intervals = [interval1, interval2]
-            else:
-                intervals = [interval2, interval1]
-
-        total = intervals[0].length() + intervals[1].length() 
-
-        def get_distance_data(intersections, side, pos):
-            int_data = intersections[side][pos]
-            if int_data.side == 0:
-                if intervals[0].contains(int_data.point):
-                    distance = (int_data.point -
-                            points_with_coeffs[intervals[0][0]]).\
-                                    mod_one()
-                    new_side = 0
-                    is_flipped = int_data.is_flipped
-                else:
-                    distance = total - (int_data.point - 
-                            points_with_coeffs[intervals[1][0]]).\
-                                    mod_one()
-                    new_side = 1
-                    is_flipped = not int_data.is_flipped
-            else:
-                if intervals[1].contains(int_data.point):
-                    distance = total - (int_data.point - 
-                            points_with_coeffs[intervals[1][0]]).\
-                                    mod_one()
-                    new_side = 0
-                    is_flipped = not int_data.is_flipped
-                else:
-                    distance = (int_data.point -
-                            points_with_coeffs[intervals[0][0]]).\
-                                    mod_one()
-                    new_side = 1
-                    is_flipped = int_data.is_flipped
-            return self.DistanceData(side = new_side,
-                distance = distance,
-                is_flipped = is_flipped,
-                orig_side = side,
-                orig_pos = pos)
-
-        return self._create_transition_data(intervals, total,
-                get_distance_data)
-
-    @staticmethod
-    def _get_distances(intersections, getter_function):
-        return [getter_function(side, pos) for side in {0, 1}
-            for pos in range(len(intersections[side]))]
-
-
-
-    def _restrict_flipped_same_side_one_sided(self, side1, pos1,
-            side2, pos2):
-        self._check_flipped(side1, pos1)
-        self._check_flipped(side2, pos2)
-        self._assert_different_pair(side1, pos1, side2, pos2)
-        assert(self._involution.is_bottom_side_moebius())
-        
-        n = len(self._divpoints[0])
-        center_left = self._divpoints[0][(pos1 + 1) % n]
-        center_right = self._divpoints[0][pos2]
-        other_left = self._divpoints[0][self._involution.pair(\
-                (side1, pos1))[1]]
-        other_right = self._divpoints[0][(self._involution.pair(\
-                (side2, pos2))[1] + 1) % n]
-        center_int = Arc(center_left, center_right,
-                left_openness = True, right_openness = True)
-        if center_int.contains(other_left) or \
-                center_int.contains(other_right):
-                    raise RestrictionError('Specified transverse '
-                    'curve does not exist. Combinatorically invalid '
-                    'choice for the intervals.')
-        if (other_right - other_left).mod_one().value <= Rational('1/2'):
-            raise RestrictionError('Specified transverse curve does '
-            'not exist. The length parameters doesn\'t allow '
-            'closing the curve to a transverse curve.')
-        other_left = other_left.half_added()
-
-        other_int = Arc(other_left, other_right,
-                left_openness = False, right_openness = False)
-
-        intervals = [center_int, other_int]
-
-        total = intervals[0].length() + intervals[1].length()
-
-        def get_distance_data(intersections, side, pos):
-            int_data = intersections[side][pos]
-            if int_data.side == 0:
-                if intervals[0].contains(int_data.point):
-                    distance = (int_data.point - center_left).\
-                            mod_one()
-                    is_flipped = int_data.is_flipped
-                else:
-                    distance = total + total - (int_data.point - 
-                            other_left).mod_one()
-                    is_flipped = not int_data.is_flipped
-            else:
-                if intervals[1].contains(int_data.point):
-                    distance = total - (int_data.point - 
-                            other_left).mod_one()
-                    is_flipped = not int_data.is_flipped
-                else:
-                    distance = (int_data.point - center_left).\
-                            mod_one() + total
-                    is_flipped = int_data.is_flipped
-            return self.DistanceData(side = 0,
-                distance = distance,
-                is_flipped = is_flipped,
-                orig_side = side,
-                orig_pos = pos)
-
-        return self._create_transition_data(intervals, total + total,
-                get_distance_data)
-
-
-
-#    def _find_pseudo_anosov_candidates(self, depth,
-
-
-#f = Foliation(Involution('a a b b c c'), [1, 2, 3])
 
