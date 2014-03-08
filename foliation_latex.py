@@ -237,11 +237,11 @@ class FoliationLatex(SageObject):
         length_labelling = self.get_option('length_labelling')
 
         latex.add_to_preamble('\\usepackage{tikz}\n')
+        latex.add_to_preamble('\\usetikzlibrary{decorations.markings}\n')
+        latex.add_to_preamble('\\usetikzlibrary{arrows}\n')
 
         s = ''
         if len(train_tracks) > 0:
-            latex.add_to_preamble('\\usetikzlibrary{decorations.markings}\n')
-            latex.add_to_preamble('\\usetikzlibrary{arrows}\n')
             s += '\\tikzset{->-/.style={\n'\
                  'decoration={markings,\n'\
                  'mark= at position #1 with {\\arrow{>}},'\
@@ -274,7 +274,7 @@ class FoliationLatex(SageObject):
             begin_percent = color_strength
             end_percent = 0
 
-            signed_label = interval.label()
+            signed_label = str(interval.label())
             if interval.is_flipped():
                 signed_label = '-' + signed_label
                 if interval > interval.pair():

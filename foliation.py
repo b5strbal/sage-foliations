@@ -1058,11 +1058,12 @@ v            OUTPUT:
             True
 
         """
-        if foliation_or_surface == 'surface':
-            return len(self.flips()) == 0)
         if foliation_or_surface == 'foliation':
-            return all(!i.is_orienation_reversing() for i in
-                       self.intervals())
+            return len(self.flips()) == 0
+        if foliation_or_surface == 'surface':
+            return all(not i.is_orienation_reversing() for side in range(2)
+                       for i in self._all_intervals[side])
+            # including the Moebius side as well
 
 
     def singularity_partition(self):
@@ -1414,10 +1415,81 @@ v            OUTPUT:
             return (mod_one(new_int.endpoint(1) - diff), new_int)
 
 
+    def _rotated_gen_perm(self, top_rotation, bottom_rotation):
+        """
+        Returns an involution where the top and bottom rows
+        are rotated cyclically.
+
+        INPUT:
+
+        - ``top`` - an integer, shift the top letters
+          cyclically by this amount
+
+        - ``bottom`` - an integer, shift the bottom letters
+          cyclically by this amount
+
+        OUTPUT:
+
+        - Involution - the rotated Involution
+
+        EXAMPLES::
+
+            sage: i = Involution('a b c b','c a d d', \
+                    flips='bc');i
+            a -b -c -b
+            -c a d d
+            sage: i.rotated(1, 1)
+            -b a -b -c
+            d -c a d
+            sage: i.rotated(-6, 2)
+            -c -b a -b
+            d d -c a
+            
+        """
+        from collections import deque
+        labels = [deque(self.labels()[side]) for side in {0, 1}]
+        rotations = (top_rotation, bottom_rotation)
+        for side in {0, 1}:
+            labels[side].rotate(rotations[side])
+        return GeneralizedPermutation(list(labels[0]), list(labels[1]), 
+                flips = self.flips())
+
+    def _reversed_gen_perm(self):
+        """
+        Returns an involution where the top and bottom rows
+        are reversed.
+
+        OUTPUT:
+
+        - Involution - the reversed Involution
+
+        EXAMPLES::
+
+            sage: i = Involution('a b c b','c a d d', \
+                    flips='bc');i
+            a -b -c -b
+            -c a d d
+            sage: i.reversed()
+            -b -c -b a
+            d d a -c
+
+        """
+        from collections import deque
+        labels = [deque(self.labels()[side]) for side in {0, 1}]
+        for side in {0, 1}:
+            labels[side].reverse()
+        return GeneralizedPermutation(list(labels[0]), list(labels[1]), 
+                flips = self.flips())
+
+
+
+
+
 
     @classmethod
     def from_separatrices(cls, separatrices, arc_length = 1, lift_type = None):
         foliation = separatrices[0][0].foliation
+        print separatrices
         done = set()
         flips = set()
         remaining_labels = range((len(separatrices[0]) +
@@ -1440,7 +1512,7 @@ v            OUTPUT:
                     end = (end + 1) % 2
                 if end == 1:
                     interval = interval.next()
-                new_side, new_i = self._matching_sep_index(separatrices,
+                new_side, new_i = cls._matching_sep_index(separatrices,
                                                            interval,
                                                            lift_type,
                                                            end, side)
@@ -1453,11 +1525,12 @@ v            OUTPUT:
                 gen_perm[side][i] = gen_perm[new_side][new_i] = label
                 done.add((side, i))
                 done.add((new_side, new_i))
+                print (side, i), (new_side, new_i)
             
                 s1 = separatrices[side][i]
                 s2 = separatrices[side][(i+1)%len(separatrices[side])]
                 lengths[label] = mod_one(s2.endpoint() - s1.endpoint())
-                if s1.end_side() < s2.end_side():
+                if s1.end_side < s2.end_side:
                     lengths[label] -= 1 - arc_length
     
         if gen_perm[1] == []:
@@ -1466,7 +1539,8 @@ v            OUTPUT:
         else:
             twist = mod_one(separatrices[1][0].endpoint() -
                             separatrices[0][0].endpoint())
-        return Foliation(*gen_perm, lengths, flips = flips, twist = twist)
+        return Foliation(*gen_perm, lengths = lengths,
+                         flips = flips, twist = twist)
 
     @staticmethod
     def _matching_sep_index(separatrices, interval, lift_type, end, orig_side):
@@ -1474,11 +1548,12 @@ v            OUTPUT:
             for j in range(len(separatrices[side])):
                 s = separatrices[side][j]
                 is_total_flipped = (s.is_flipped() != (end==1))
+                print is_total_flipped
                 if s.first_interval() == interval:
                     if lift_type == None or \
-                       lift_type == 'foliaion' and is_total_flipped or \
+                       lift_type == 'foliation' and not is_total_flipped or \
                        lift_type == 'surface' and \
-                       (s.end_side == orig_side) != is_total_flipped:
+                       (s.end_side == orig_side) == is_total_flipped:
                         return (side, j)
         assert(False)
 
@@ -1571,9 +1646,14 @@ v            OUTPUT:
 
         if self.is_orientable(foliation_or_surface):
             return self
+        from separatrix import Separatrix
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop=0)
         if foliation_or_surface == 'foliation':
             separatrices += Separatrix.get_all(self, number_of_flips_to_stop=1)
+            # removing removable singularities
+            separatrices = [s for s in separatrices
+                            if s.first_interval().prev() !=
+                            s.first_interval().pair()]
         elif foliation_or_surface == 'surface':
             separatrices += Separatrix.get_all(self,
                                         stop_at_first_orientation_reverse=True)
