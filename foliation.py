@@ -1488,50 +1488,56 @@ v            OUTPUT:
 
     @classmethod
     def from_separatrices(cls, separatrices, arc_length = 1, lift_type = None):
-        foliation = separatrices[0][0].foliation
         print separatrices
-        done = set()
+        is_map_from_new = is_map_to_new = True
         flips = set()
         remaining_labels = range((len(separatrices[0]) +
                                   len(separatrices[1]))/2, 0, -1)
         gen_perm = [[0] * len(separatrices[i]) for i in range(2)]
         lengths = {}
+        tt_vertex_candidates = {}
         for side in range(2):
             for i in range(len(separatrices[side])):
-                if (side, i) in done:
+                if (side, i) in tt_vertex_candidates.keys():
                     continue
                 label = remaining_labels.pop()
-                end = 0 # traces which end of the current interval we are
-                s = separatrices[side][i]
-                interval = s.first_interval()
-                if s.is_flipped():
-                    interval = interval.prev()
-                    end = 1
-                interval = interval.pair()
-                if interval.is_flipped():
-                    end = (end + 1) % 2
-                if end == 1:
-                    interval = interval.next()
+                intervals = []; ends = []
+                for end in range(2):
+                    a, b = cls._trace_back(separatrices, side, i, end)
+                    intervals.append(a)
+                    ends.append(b)
+                    print a, b
                 new_side, new_i = cls._matching_sep_index(separatrices,
-                                                           interval,
-                                                           lift_type,
-                                                           end, side)
+                                                          intervals[0],
+                                                          ends[0],
+                                                          side,
+                                                          lift_type)
 
-                if separatrices[new_side][new_i].is_flipped():
-                    end = (end + 1) % 2
-                if end == 1:
+                if separatrices[new_side][new_i].is_flipped() == (ends[0]%2==0):
                     new_i = (new_i - 1) % len(separatrices[new_side])
                     flips.add(label)
                 gen_perm[side][i] = gen_perm[new_side][new_i] = label
-                done.add((side, i))
-                done.add((new_side, new_i))
                 print (side, i), (new_side, new_i)
+                
+
             
                 s1 = separatrices[side][i]
                 s2 = separatrices[side][(i+1)%len(separatrices[side])]
                 lengths[label] = mod_one(s2.endpoint() - s1.endpoint())
                 if s1.end_side < s2.end_side:
                     lengths[label] -= 1 - arc_length
+
+                tt_vertex_candidates[label] = list(set(intervals))
+                
+                # updating which direction there might be
+                # a train track map
+                # for interval in tt_vertex_candidates[label]:
+                #     l = interval.length()
+                #     newl = lengths[label]
+                #     if l < newl - epsilon:
+                #         is_map_from_new = False
+                #     if newl < l - espilon:
+                #         is_map_to_new = False
     
         if gen_perm[1] == []:
             gen_perm[1] = 'moebius'
@@ -1542,11 +1548,56 @@ v            OUTPUT:
         return Foliation(*gen_perm, lengths = lengths,
                          flips = flips, twist = twist)
 
+
+
+        
+    # def _choose_pairing(pairing):
+    #     #generate pairings in the opposite direction
+    #     rev_pairing = {}
+    #     for x in pairing:
+    #         for y in pairing[x]:
+    #             if y in rev_pairing:
+    #                 rev_pairing[y].append(x)
+    #             else:
+    #                 rev_pairing[y] = [x]
+                    
+    #     for x in pairing:
+    #         if len(pairing[x]) == 1:
+    #             # already a single choice left
+    #             continue
+    #         x1 = x
+    #         while True:
+    #             y = pairing[x1][0]
+    #             rev_pairing[y].remove(x1)
+    #             x1 = rev_pairing[y][0]
+    #             pairing[x1].remove(y)
+    #             if x1 == x:
+    #                 break
+
+
     @staticmethod
-    def _matching_sep_index(separatrices, interval, lift_type, end, orig_side):
+    def _trace_back(separatrices, side, pos, end):
+        s = separatrices[side][pos]
+        interval = s.first_interval()
+        if s.is_flipped():
+            end = (end + 1) % 2
+            # stepping back or forward depending on which end we are at
+            interval = interval.add_to_position((-1)**end)
+        interval = interval.pair()
+        if interval.is_flipped():
+            # stepping back or forward depending on which end we are at
+            interval = interval.add_to_position((-1)**end)
+            end = (end + 1) % 2
+        return (interval, end)
+
+
+    @staticmethod
+    def _matching_sep_index(separatrices, interval, end, orig_side, lift_type):
+        if end == 1:
+            interval = interval.next()
         for side in range(2):
-            for j in range(len(separatrices[side])):
-                s = separatrices[side][j]
+            for pos in range(len(separatrices[side])):
+                s = separatrices[side][pos]
                 is_total_flipped = (s.is_flipped() != (end==1))
                 print is_total_flipped
                 if s.first_interval() == interval:
@@ -1554,7 +1605,7 @@ v            OUTPUT:
                        lift_type == 'foliation' and not is_total_flipped or \
                        lift_type == 'surface' and \
                        (s.end_side == orig_side) == is_total_flipped:
-                        return (side, j)
+                        return (side, pos)
         assert(False)
 
 
