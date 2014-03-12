@@ -1,6 +1,7 @@
 
 from sage.graphs.digraph import DiGraph
 from foliation import mod_one
+from collections import namedtuple
 
 class TrainTrack(DiGraph):
     def __init__(self, foliation):
@@ -25,12 +26,28 @@ class TrainTrack(DiGraph):
                         mod_one(interval.endpoint(0) + 0.5), 0)
             self.add_edge(interval, containing_int, 'center')
 
+    @property
+    def foliation():
+        return self._foliation
+
     class OrientedEdge(namedtuple('OrientedEdge', 'edge, direction')):
         def __new__(cls, edge, direction):
             return super(OrientedEdge, cls).__new__(cls, edge, direction)
 
         def reversed(self):
             return OrientedEdge(self.edge, -self.direction)
+
+        def endpoint(self, end):
+            if (end == 1) == (self.direction == 1):
+                return self.edge[0]
+            return self.edge[1]
+
+        def start(self):
+            return self.endpoint(0)
+
+        def end(self):
+            return self.endpoint(1)
+    
 
     def get_oriented_edge(self, start, end, label, crossing = None):
         has_forward = self.has_edge(start, end, label)
@@ -45,17 +62,17 @@ class TrainTrack(DiGraph):
             return OrientedEdge((start, end, label), 1)
         return OrientedEdge((end, start, label), -1)
 
-    def get_first_edge(self, separatrix, left_or_right):
-        first_interval = separatrix.traversed_intervals[0]
-        if left_or_right == 'left':
-            first_interval = first_interval.prev()
-        if self._foliation.is_bottom_side_moebius():
-            return self.get_oriented_edge(first_interval, 
-                    separatrix.traversed_intervals[3], 'center')
-        else:
-            return self.get_oriented_edge(first_interval, 
-                    separatrix.traversed_intervals[1], 'center',
-                    crossing = separatrix.intersections[0])
+    # def get_first_edge(self, separatrix, left_or_right):
+    #     first_interval = separatrix.traversed_intervals[0]
+    #     if left_or_right == 'left':
+    #         first_interval = first_interval.prev()
+    #     if self._foliation.is_bottom_side_moebius():
+    #         return self.get_oriented_edge(first_interval, 
+    #                 separatrix.traversed_intervals[3], 'center')
+    #     else:
+    #         return self.get_oriented_edge(first_interval, 
+    #                 separatrix.traversed_intervals[1], 'center',
+    #                 crossing = separatrix.intersections[0])
 
     def _latex_(self):
         r"""
@@ -66,43 +83,43 @@ class TrainTrack(DiGraph):
         return FoliationLatex(self._foliation).tikz_picture(
             train_tracks = [self])
         
-
-    class Path:
-        def __init__(self, oriented_edges):
-            self._path = oriented_edges
-
-        @classmethod
-        def from_separatrix(cls, separatrix):
-            closing_ints = separatrix.closing_intervals()
-            trav_ints = separatrix.traversed_intervals
-            trav_ints.extend(closing_ints)
-            path = []
-            if separatrix._foliation.is_bottom_side_moebius():
-                for i in range(1, (len(separatrix.intersections) + 1) // 2):
-                    path.append(self.get_oriented_edge(trav_ints[4 * i - 1],
-                        trav_ints[4 * i], 'pair'))
-                    path.append(self.get_oriented_edge(trav_ints[4 * i],
-                        trav_ints[4 * i + 3], 'center'))
-            else:
-                for i in range(1, len(separatrix.intersections)):
-                    path.append(self.get_oriented_edge(trav_ints[2 * i - 1], 
-                        trav_ints[2 * i], 'pair'))
-                    path.append(self.get_oriented_edge(trav_ints[2 * i],
-                        trav_ints[2 * i + 1], 'center', 
-                        crossing = separatrix.intersections[i]))
-            del trav_ints[-len(closing_ints):]
-            return cls(path)
-
+        
+    class Path(list):
         def reversed(self):
-            return TrainTrack.Path([oriented_edge.reversed() for 
-                oriented_edge in reversed(self._path)])
+            return TrainTrack.Path([oe.reversed() for 
+                            oe in reversed(self)])
 
-        def __add__(self, other):
-            assert(self._path[-1] == other._path[0])
-            return TrainTrack.Path(self._path[:-1] + other._path)
+        # def __add__(self, other):
+        #     return TrainTrack.Path(self.oriented_edge_list +
+        #                            other.oriented_edge_list)
 
-
-
-
+               
+    class Map(namedtuple("TrainTrackMap", "domain, codomain,"
+                         "vertex_map, edge_map")):
+        def __mul__(self, other):
+            new_vertex_map = {v:self.vertex_map[other.vertex_map[v]]
+                              for v in other.vertex_map}
+            new_edge_map = {e:self._map_path[other.edge_map[e]]
+                            for e in other.edge_map}
+               
+            return TrainTrack.Map(domain = other.domain,
+                                  codomain = self.codomain,
+                                  vertex_map = new_vertex_map,
+                                  edge_map = new_edge_map)
+               
+        def _map_path(self, path):
+            new_path = []
+            for oe in path:
+                p = self.edge_map[oe.edge]
+                if oe.direction == 1:
+                    new_path.extend(p)
+                else:
+                    new_path.extend(p.reversed())
+            return TrainTrack.Path(new_path)
+            
+        
+                                  
+                                
+                                  
 
 
