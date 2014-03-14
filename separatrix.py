@@ -1,8 +1,11 @@
 from sage.structure.sage_object import SageObject
 from foliation import mod_one
+from train_track import TrainTrack
 
 class Separatrix(SageObject):
-    def __init__(self, train_track, interval, end = 0, stop_function)
+    def __init__(self, foliation, interval, end = 0, bounding_arc = None,
+                 number_of_flips_to_stop = None,
+                 stop_at_first_orientation_reverse = False):
         r"""
         Calculates the segment of a separatrix before first intersecting
         a set of intervals.
@@ -15,7 +18,7 @@ class Separatrix(SageObject):
         a Foliation with Involution('1 2 3 4 5 6', '2 1 4 3 6 5') has
         six singularities above and below as well, but here our curve is
         not separating, so the top and bottom part is actually connected.
-        Moreover, it is only 2 singularities, not 12, becuase vertices
+        Moreover, it is only 2 singularities, not 12, because vertices
         are identified. It is just that when the Foliation is drawn,
         then there is 12 problematic points, corresponding to the 12
         separatrices.
@@ -26,33 +29,58 @@ class Separatrix(SageObject):
         side and position of the corresponding interval.
 
         """
-        self._foliation = train_track.foliation
-        self._tt = train_track
+        self._foliation = foliation
+        self._tt = foliation.train_track
         assert(not self._foliation.is_bottom_side_moebius() or 
                 interval.side == 0) # otherwise it is not a real separatrix
         self._flip_count = 0
+        self._end = end
         p = interval.endpoint(end)
         self._intersections = [p]
         self._tt_path = TrainTrack.Path()
         self._center_lengthen(p, interval)
 
+        other_int = interval.prev() if end == 0 else interval.next()
+        self._other_first_edge = self._tt.get_oriented_edge(other_int,
+                                            self._tt_path[0].end(),
+                                                             'center',p)
+        
+        
         # this is -1 if we are at the last element of self._intersections
         # and -2 if it is the second to last element. Only used when the
         # bottom side is a Moebius band.
         self._current_index = -2
 
-        while not stop_function():
+        if bounding_arc == None:
+            if number_of_flips_to_stop != None:
+                def terminate():
+                    return self._flip_count == number_of_flips_to_stop
+            elif stop_at_first_orientation_reverse:
+                def terminate():
+                    return self.is_orientation_reversing()
+            else:
+                assert(False)
+        else:
+            def terminate():
+                return bounding_arc.contains(
+                    self._intersections[self._current_index])
+
+
+        while not terminate():
             self.lengthen()
 
 
+
         
-    def lengthen():
-        if self._foliation.is_bottom_side_moebius() and current_index == -2:
+    def lengthen(self):
+        # crossing the centerline
+        if self._foliation.is_bottom_side_moebius() and self._current_index == -2:
             self._current_index = -1
             return
         
+        # moving to pair (and crossing center line if not moebius)
         self._current_index = -2
-        last_int = self._tt_path[-1].endpoint(1)
+        last_int = self._tt_path[-1].end()
         if last_int.is_flipped():
             self._flip_count += 1
         p, new_int = self._foliation.apply_iet(self._intersections[-1],
@@ -62,37 +90,33 @@ class Separatrix(SageObject):
                                                         'pair'))
         self._center_lengthen(p)
 
-    def _center_lengthen(self, p, last_int = self._tt_path[-1].endpoint(1)):
+    def _center_lengthen(self, p, last_int = None):
+        if last_int == None:
+            last_int = self._tt_path[-1].end()
         p, new_int = self._foliation.point_int_on_other_side(p,
                                                     last_int.side)
         self._intersections.append(p)
         self._tt_path.append(self._tt.get_oriented_edge(last_int, new_int,
                                                     'center', p))
                 
+    def tt_path(self, end):
+        first_edge = self._tt_path[0] if end == self._end else \
+                self._other_first_edge
+        return TrainTrack.Path([first_edge] + self._tt_path[1:])
 
-    @classmethod
-    def from_bounding_arc(cls, train_track, interval, end, bounding_arc):
-        def stop_function(self):
-            return bounding_arc.contains(self._intersections[self._current_index])
-        return Separatrix(train_track, interval, end, stop_function)
-
-    @classmethod
-    def from_flips_to_stop(cls, train_track, interval, end,
-                           number_of_flips_to_stop):
-        def stop_function(self):
-            return self._flip_count == number_of_flips_to_stop
-        return Separatrix(train_track, interval, end, stop_function)
-        
-    @classmethod
-    def get_first_orientation_reversing(cls, train_track, interval, end):
-        def stop_function(self):
-            return self.is_orientation_reversing()
-        return Separatrix(train_track, interval, end, stop_function)
-    
 
     def _repr_(self):
-        s = "Intersections: " + repr(self._intersections)
-        s += "\nTraversed ints: " + repr(self._traversed_intervals)
+        s = "Intersections: "
+        if self._current_index == -2:
+            s += repr(self._intersections[:self._current_index+1])
+        else:
+            s += repr(self._intersections)
+        
+        # s += "\nTrain Track Path: " + repr(self._tt_path)
+        s += "\nTraversed intervals; "
+        for oriented_edge in self._tt_path:
+            s += repr(oriented_edge.start()) + ", "
+        s += repr(self._tt_path[-1].end())
         s += "\nFlips: " + repr(self._flip_count)
         return s
 
@@ -123,11 +147,16 @@ class Separatrix(SageObject):
     def endpoint(self):
         return self._intersections[self._current_index]
 
-    # def first_interval(self):
-    #     return self._traversed_intervals[0]
+    def first_interval(self):
+        return self._tt_path[0].start()
 
     def first_interval_end(self):
-        return self._first_interval_end
+        return self._end
+
+    def final_end(self):
+        if not self.is_flipped():
+            return self._end
+        return (self._end + 1) % 2
 
     def is_flipped(self):
         return self._flip_count % 2 == 1
@@ -141,34 +170,18 @@ class Separatrix(SageObject):
                            stop_at_first_orientation_reverse) for
                 interval in foliation.intervals()]
 
+
     @classmethod
     def sorted_separatrices(cls, separatrices, starting_point = 0):
+        # xprint separatrices
         return [sorted([s for s in separatrices if 
                         s.end_side == side],
-                       key = lambda s: mod_one(s.endpoint() -
+                       key = lambda s: mod_one(s.endpoint -
                                                starting_point))
                 for side in {0, 1}]
         
         
 
-
-    def shorten(self):
-        self._traversed_intervals.pop()
-        if self._traversed_intervals[-1].is_flipped():
-            self._flip_count -= 1
-        self._traversed_intervals.pop()
-        self._intersections.pop()
-
-    def shift_to_end(self, new_end):
-        if new_end == self._first_interval_end:
-            return
-        if new_end == 1: #shift to left
-            shift = -1
-        if new_end == 0: #shift to right
-            shift = 1
-        self._first_interval_end = new_end
-        self._traversed_intervals[0] =\
-            self._traversed_intervals[0].add_to_position(shift)
         
     def _latex_(self):
         from foliation_latex import FoliationLatex
@@ -197,3 +210,23 @@ class Separatrix(SageObject):
     #     new_separatrix._traversed_intervals = self._traversed_intervals[:]
     #     new_separatrix.lengthen()
     #     return new_separatrix
+
+
+
+    # def shorten(self):
+    #     self._traversed_intervals.pop()
+    #     if self._traversed_intervals[-1].is_flipped():
+    #         self._flip_count -= 1
+    #     self._traversed_intervals.pop()
+    #     self._intersections.pop()
+
+    # def shift_to_end(self, new_end):
+    #     if new_end == self._first_interval_end:
+    #         return
+    #     if new_end == 1: #shift to left
+    #         shift = -1
+    #     if new_end == 0: #shift to right
+    #         shift = 1
+    #     self._first_interval_end = new_end
+    #     self._traversed_intervals[0] =\
+    #         self._traversed_intervals[0].add_to_position(shift)

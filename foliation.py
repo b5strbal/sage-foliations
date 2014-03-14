@@ -2,6 +2,9 @@ from sage.dynamics.interval_exchanges.constructors import GeneralizedPermutation
 from sage.structure.sage_object import SageObject
 from collections import namedtuple
 from sage.matrix.constructor import vector
+
+LEFT = -1
+RIGHT = 1
 epsilon = 1e-10
 
 
@@ -160,136 +163,6 @@ def get_good_eigendata(transition_matrix, is_twisted):
 
 
 
-
-
-
-
-
-
-
-#class PointWithCoefficients(namedtuple("Pwc", 
-#        "value, coefficients")):
-#    """
-#    Represents a real number together with its coefficients as
-#    a linear combination of the a certain set of real numbers.
-#
-#    In practice this set is the set of interval lengths and 
-#    possibly the twist of a Foliation.
-#
-#    INPUT:
-#
-#    - ``value`` - a real number (can be floating point, 
-#      or an exact algebraic number)
-#
-#    - ``coefficients`` - a list or tuple or vector of 
-#      the coefficients
-#
-#    EXAMPLES:
-#
-#    The coefficients can be specified as a list, tuple or 
-#    vector::
-#
-#        sage: from sage.dynamics.foliations.foliation import \
-#                PointWithCoefficients
-#        sage: a = PointWithCoefficients(1.2, (3, -1, 0))
-#        sage: b = PointWithCoefficients(0.8, [2, 1, 5])
-#        sage: c = PointWithCoefficients(3.4, vector((2, 3)))
-#
-#    One can add or subtract two objects as long as they are 
-#    of the same type:
-#
-#        sage: a + b
-#        (2.00000000000000, (5, 0, 5))
-#        sage: a - b
-#        (0.400000000000000, (1, -2, -5))
-#    
-#    """
-#    def __new__(cls, value, coefficients):
-#        self = super(PointWithCoefficients, cls).__new__(cls, 
-#                value, vector(coefficients))
-#        return self
-#
-#    def __repr__(self):
-#        """
-#        Returns the representation of self.
-#
-#        TESTS::
-#
-#            sage: from sage.dynamics.foliations.foliation import \
-#                PointWithCoefficients
-#            sage: PointWithCoefficients(3, (4, 3, 2))
-#            (3, (4, 3, 2))
-#
-#        """
-#        return repr((self.value, self.coefficients))
-#
-#    def __add__(self, other):
-#        """
-#        Adds the numbers and their coefficient vectors.
-#
-#        TESTS::
-#
-#            sage: from sage.dynamics.foliations.foliation import PointWithCoefficients
-#            sage: a = PointWithCoefficients(1.2, (3, -1, 0))
-#            sage: b = PointWithCoefficients(0.8, (2, 1, 5))
-#            sage: a + b
-#            (2.00000000000000, (5, 0, 5))
-#
-#        """
-#        return PointWithCoefficients(self.value + other.value,
-#                self.coefficients + other.coefficients)
-#        
-#    def __sub__(self, other):
-#        """
-#        Subtracts the numbers and their coefficient vectors.
-#
-#        TESTS::
-#
-#            sage: from sage.dynamics.foliations.foliation import PointWithCoefficients
-#            sage: a = PointWithCoefficients(1.2, (3, -1, 0))
-#            sage: b = PointWithCoefficients(0.8, [2, 1, 5])
-#            sage: a - b
-#            (0.400000000000000, (1, -2, -5))
-#        """
-#        return PointWithCoefficients(self.value - other.value,
-#                self.coefficients - other.coefficients)
-#
-#
-#    def mod_one(self):
-#        """
-#        Returns the PointWithCoefficients corresponding to the
-#        real number of self modulo 1.
-#
-#        The sum of the numbers in the generating set used for
-#        linear combinations is 1 hence all but the twist
-#        coefficient is decreased by the floor of the real
-#        number of self.
-#
-#        OUTPUT:
-#
-#        - PointWithCoefficients --
-#
-#        EXAMPLES::
-#
-#            sage: from sage.dynamics.foliations.foliation import PointWithCoefficients
-#            sage: p = PointWithCoefficients(3.2, (4, 5, 3))
-#            sage: p.mod_one()
-#            (0.200000000000000, (1, 2, 3))
-#
-#            sage: q = PointWithCoefficients(-1.3, (0, 2, 4,-2))
-#            sage: q.mod_one()
-#            (0.700000000000000, (2, 4, 6, -2))
-#
-#        """
-#        from sage.functions.other import floor 
-#        if self.value == 0: #need to check beacuse of a bug
-#            # with algebraic numbers
-#            n = 0
-#        else:
-#            n = floor(self.value)
-#        return PointWithCoefficients(self.value - n, [x - n 
-#            for x in self.coefficients[:-1]] + \
-#                    [self.coefficients[-1]])
 
 
 
@@ -566,6 +439,7 @@ class Foliation(SageObject):
             Moebius band
 
         """
+        self._tt = None # Train Track is created only when first used.
 
         if bottom_letters == 'moebius': # bottom side is Moebius
             bottom_letters = 'JOKER JOKER'
@@ -647,8 +521,6 @@ class Foliation(SageObject):
         if self.is_bottom_side_moebius():
             self._lengths['JOKER'] = sum(self._lengths.values())
             twist = 0
-            #self._half = PointWithCoefficients(Rational('1/2'),
-            #        basis_vector(len(lcopy) + 1, len(lcopy) - 1))
 
         totals = [sum(interval.length() for interval in 
             self._all_intervals[side]) for side in {0,1}]
@@ -667,46 +539,21 @@ class Foliation(SageObject):
 
         for label in self._lengths:
             self._lengths[label] /= totals[1]
-        #for letter in lcopy:
-        #    self._lengths[letter] = PointWithCoefficients(\
-        #            lcopy[letter]/totals[1], 
-        #            basis_vector(len(lcopy) + 1,
-        #                involution.index(letter)))
-
-        #self._divpoints = [[PointWithCoefficients(0,
-        #    [0] * (len(lcopy) + 1))]
-        #    for i in range(2)] 
         self._divvalues = [[0], [0]]
 
-        #for i in range(2):
-        #    for j in range(len(involution[i]) - 1):
-        #        self._divpoints[i].append(self._divpoints[i][-1] +
-        #                self._lengths[involution[i][j]])
         for interval in self._all_intervals[0] + self._all_intervals[1]:
             self._divvalues[interval.side].append(self._divvalues[
                 interval.side][-1] + self._lengths[interval.label()])
         for side in {0,1}:
             self._divvalues[side].pop()
 
-        #self._divvalues = [[x.value for x in self._divpoints[i]] 
-        #    for i in range(2)]
-
         preimage_of_zero = mod_one(-twist/totals[1])
         containing_int = bisect_left(self._divvalues[1], 
                 preimage_of_zero) % self.num_intervals(1)
         self._gen_perm = self._rotated_gen_perm(0, -containing_int)
-        #self._twist = PointWithCoefficients(mod_one(\
-        #        self._divpoints[1][containing_int].value - 
-        #        preimage_of_zero), [0] * len(lcopy) + [1])
         self._twist = mod_one(self._divvalues[1][containing_int] -
                 preimage_of_zero)
-        #self._divpoints[1] = [self._twist]
         self._divvalues[1] = [self._twist]
-        #for j in range(len(involution[1]) - 1):
-        #    self._divpoints[1].append(self._divpoints[1][-1] +
-        #            self._lengths[self._involution[1][j]])
-
-        #self._divvalues[1] = [x.value for x in self._divpoints[1]] 
         for interval in self._all_intervals[1]:
             self._divvalues[1].append(self._divvalues[1][-1] + 
                     interval.length())
@@ -728,6 +575,13 @@ class Foliation(SageObject):
 
     def labels(self):
         return self._gen_perm.list()
+
+    @property
+    def train_track(self):
+        from train_track import TrainTrack
+        if not isinstance(self._tt, TrainTrack):
+            self._tt = TrainTrack(self)
+        return self._tt
 
     def index_of_label(self, label):
         """
@@ -1498,134 +1352,6 @@ v            OUTPUT:
 
 
 
-    @classmethod
-    def from_separatrices(cls, separatrices, arc_length = 1, lift_type = None):
-        foliation = separatrices[0][0].foliation
-        print separatrices
-        done = set()
-        flips = set()
-        remaining_labels = range((len(separatrices[0]) +
-                                  len(separatrices[1]))/2, 0, -1)
-        gen_perm = [[0] * len(separatrices[i]) for i in range(2)]
-        lengths = {}
-        paths = []
-        PathEntry = namedtuple("PathEntry", "start_int,end_int,path")
-
-    
-        if gen_perm[1] == []:
-            gen_perm[1] = 'moebius'
-            twist = None
-        else:
-            from bisect import bisect
-            twist = mod_one(separatrices[1][0].endpoint() -
-                            separatrices[0][0].endpoint())
-            bottom_rotation = bisect([s.endpoint()
-                                      for s in separatrices[1]],
-                                     separatrices[0][0].endpoint())
-
-        for side in range(2):
-            for i in range(len(separatrices[side])):
-                if (side, i) in done:
-                    continue
-                label = remaining_labels.pop()
-                end = 0 # traces which end of the current interval we are
-                s = separatrices[side][i]
-                assert(separatrices.first_interval_end() == 0)
-                interval = s.first_interval()
-                if s.is_flipped():
-                    interval = interval.prev()
-                    end = 1
-                
-                # converting first separatric to train track path
-                s.shift_to_end(end)
-                path = TrainTrack.Path.from_separatrix(s)
-                s.shift_to_end(0)
-                path = path.reversed()
-
-                # adding connecting interval to train track path
-                interval2 = interval.pair()
-                path.append(TrainTrack.get_oriented_edge(interval,
-                                                         interval2,
-                                                         'pair'))
-                interval = interval2
-                if interval.is_flipped():
-                    end = (end + 1) % 2
-                if end == 1:
-                    interval = interval.next()
-                new_side, new_i = cls._matching_sep_index(separatrices,
-                                                           interval,
-                                                           lift_type,
-                                                           end, side)
-
-                # converting second separatrix to train track path
-                s = separatrices[new_side][new_i]
-                s.shift_to_end(end)
-                path = TrainTrack.Path.from_separatrix(s)
-                s.shift_to_end(0)
-                
-                if s.is_flipped():
-                    end = (end + 1) % 2
-                if end == 1:
-                    new_i = (new_i - 1) % len(separatrices[new_side])
-                    flips.add(label)
-                gen_perm[side][i] = gen_perm[new_side][new_i] = label
-                done.add((side, i))
-                done.add((new_side, new_i))
-                print (side, i), (new_side, new_i)
-
-                if new_side == 1:
-                    new_i-= (new_i - bottom_rotation) % len(separatrices[1])
-                paths.append(PathEntry((side,i),(new_side, new_i), path)) 
-            
-                s1 = separatrices[side][i]
-                s2 = separatrices[side][(i+1)%len(separatrices[side])]
-                lengths[label] = mod_one(s2.endpoint() - s1.endpoint())
-                if s1.end_side < s2.end_side:
-                    lengths[label] -= 1 - arc_length
-
-
-        fol = Foliation(*gen_perm, lengths = lengths,
-                         flips = flips, twist = twist)
-
-        tt_old = TrainTrack(separatrices[0][0].foliation)
-        tt_new = TrainTrack(fol)
-        vertex_map = {}
-        edge_map = {}
-
-        for pe in paths:
-            for new_edge in tt_new.edges():
-                if new_edge[0].as_tuple() in [pe.start_int, pe.end_int]:
-                    if new_edge[2] == 'pair':
-                        new_path = TrainTrack.Path(pe.path.oriented_edge_list[1:-1])
-                        if new_edge[0].as_tuple() == pe.end_int:
-                            new_path = new_path.reversed()
-                    elif new_edge[2] == 'center':
-                        if new_edge[0].as_tuple() == pe.end_int:
-                            new_path = TrainTrack.Path(pe.path[-1])
-                            # need to consider the case when end=1 for the second separatrix
-                        else:
-                            new_path = TrainTrack.Path(pe.path[0].reversed())
-                        # need to consider the case when the strip hits the
-                        # corner of the transverse curve
-                    edge_map[new_edge] = new_path
-
-                        
-
-    @staticmethod
-    def _matching_sep_index(separatrices, interval, lift_type, end, orig_side):
-        for side in range(2):
-            for j in range(len(separatrices[side])):
-                s = separatrices[side][j]
-                is_total_flipped = (s.is_flipped() != (end==1))
-                print is_total_flipped
-                if s.first_interval() == interval:
-                    if lift_type == None or \
-                       lift_type == 'foliation' and not is_total_flipped or \
-                       lift_type == 'surface' and \
-                       (s.end_side == orig_side) == is_total_flipped:
-                        return (side, j)
-        assert(False)
-
 
 
     def double_cover(self, foliation_or_surface):
@@ -1727,8 +1453,156 @@ v            OUTPUT:
             separatrices += Separatrix.get_all(self,
                                         stop_at_first_orientation_reverse=True)
 
-        return Foliation.from_separatrices(Separatrix.sorted_separatrices(
+        return from_separatrices(Separatrix.sorted_separatrices(
             separatrices), lift_type = foliation_or_surface)
         
 
 
+def from_separatrices(separatrices,
+                      arc_length = 1, lift_type = None,
+                      left_antenna = None):
+    # foliation = separatrices[0][0].foliation
+    # print separatrices
+
+    flips = set()
+    remaining_labels = range((len(separatrices[0]) +
+                              len(separatrices[1]))/2, 0, -1)
+    gen_perm = [[None] * len(separatrices[i]) for i in range(2)]
+    lengths = {}
+    paths = {}
+
+
+    if gen_perm[1] == []:
+        gen_perm[1] = 'moebius'
+        twist = None
+        bottom_rotation = 0
+    else:
+        from bisect import bisect
+        twist = mod_one(separatrices[1][0].endpoint -
+                        separatrices[0][0].endpoint)
+        bottom_rotation = bisect([s.endpoint
+                                  for s in separatrices[1]],
+                                 separatrices[0][0].endpoint)
+
+    # print separatrices
+    for side in range(2):
+        for i in range(len(separatrices[side])):
+            if gen_perm[side][i] != None:
+                continue
+
+            for end in range(2):
+                paths[(side,i,end)] = \
+                        get_pair_and_path(separatrices,
+                                          side, i, end,
+                                          bottom_rotation,
+                                          lift_type)
+
+            p = paths[(side, i, 0)]
+            label = remaining_labels.pop()
+            if p.new_end == 1:
+                flips.add(label)
+            gen_perm[side][i] = gen_perm[p.new_side][p.new_i] = label
+
+            s1 = separatrices[side][i]
+            s2 = separatrices[side][(i+1)%len(separatrices[side])]
+            lengths[label] = mod_one(s2.endpoint - s1.endpoint)
+            if s1.end_side < s2.end_side:
+                lengths[label] -= 1 - arc_length
+
+
+    fol = Foliation(*gen_perm, lengths = lengths,
+                     flips = flips, twist = twist)
+    return fol
+    old_fol = separatrices[0][0].foliation
+    tt_new = fol.train_track
+    tt_old = old_fol.train_track
+    vertex_map = {}
+    edge_map = {}
+
+    for pe in paths:
+        for new_edge in tt_new.edges():
+            if new_edge[0].as_tuple() in [pe.start_int, pe.end_int]:
+                if new_edge[2] == 'pair':
+                    new_path = TrainTrack.Path(pe.path.oriented_edge_list[1:-1])
+                    if new_edge[0].as_tuple() == pe.end_int:
+                        new_path = new_path.reversed()
+                elif new_edge[2] == 'center':
+                    if new_edge[0].as_tuple() == pe.end_int:
+                        new_path = TrainTrack.Path(pe.path[-1])
+                        # need to consider the case when end=1 for the second separatrix
+                    else:
+                        new_path = TrainTrack.Path(pe.path[0].reversed())
+                    # need to consider the case when the strip hits the
+                    # corner of the transverse curve
+                edge_map[new_edge] = new_path
+
+
+
+
+
+
+
+
+PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
+
+def get_pair_and_path(separatrices, side, i, end, bottom_rotation,
+                       lift_type):
+
+    tt = separatrices[0][0].foliation.train_track
+    s = separatrices[side][(i + end) % len(separatrices[side])]
+    print s
+    assert(s.first_interval_end() == 0)
+    if s.is_flipped():
+        end = (end + 1) % 2
+    
+    # converting first separatric to train track path
+    path = s.tt_path(end).reversed()
+    interval = path[-1].end()
+    # adding connecting interval to train track path
+    interval2 = interval.pair()
+    path.append(tt.get_oriented_edge(interval,
+                                             interval2,
+                                             'pair'))
+    interval = interval2
+    if interval.is_flipped():
+        end = (end + 1) % 2
+    if end == 1:
+        interval = interval.next()
+    new_side, new_i = matching_sep_index(separatrices,
+                                              interval,
+                                              lift_type,
+                                              end, side)
+    # converting second separatrix to train track path
+    s = separatrices[new_side][new_i]
+    path.append(s.tt_path(end))
+
+    if s.is_flipped():
+        end = (end + 1) % 2
+    if end == 1:
+        new_i = (new_i - 1) % len(separatrices[new_side])
+    if new_side == 1:
+        new_i = (new_i - bottom_rotation) % len(separatrices[1])
+    return PathEntry(new_side,new_i,end,path)
+
+
+
+
+def matching_sep_index(separatrices, interval, lift_type, end, orig_side):
+    for side in range(2):
+        for j in range(len(separatrices[side])):
+            s = separatrices[side][j]
+            is_total_flipped = (s.is_flipped() != (end==1))
+            # print is_total_flipped
+            # print s.first_interval()
+            # print s.endpoint
+            # print s.first_interval(), '\n'
+            if s.first_interval() == interval:
+                
+                if lift_type == None or \
+                   lift_type == 'foliation' and not is_total_flipped or \
+                   lift_type == 'surface' and \
+                   (s.end_side == orig_side) == is_total_flipped:
+                    return (side, j)
+    
+    # print interval
+    assert(False)

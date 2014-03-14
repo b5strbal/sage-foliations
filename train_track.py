@@ -3,6 +3,29 @@ from sage.graphs.digraph import DiGraph
 from foliation import mod_one
 from collections import namedtuple
 
+class OrientedEdge(namedtuple('OrientedEdge', 'edge, direction')):
+    def __new__(cls, edge, direction):
+        return super(OrientedEdge, cls).__new__(cls, edge, direction)
+        
+    def reversed(self):
+        return OrientedEdge(self.edge, -self.direction)
+
+    # def endpoint(self, end):
+    #     if (end == 1) == (self.direction == 1):
+    #         return self.edge[0]
+    #     return self.edge[1]
+
+    def start(self):
+        if self.direction == 1:
+            return self.edge[0]
+        return self.edge[1]
+
+    def end(self):
+        if self.direction == 1:
+            return self.edge[1]
+        return self.edge[0]
+
+
 class TrainTrack(DiGraph):
     def __init__(self, foliation):
         self._foliation = foliation
@@ -30,23 +53,6 @@ class TrainTrack(DiGraph):
     def foliation():
         return self._foliation
 
-    class OrientedEdge(namedtuple('OrientedEdge', 'edge, direction')):
-        def __new__(cls, edge, direction):
-            return super(OrientedEdge, cls).__new__(cls, edge, direction)
-
-        def reversed(self):
-            return OrientedEdge(self.edge, -self.direction)
-
-        def endpoint(self, end):
-            if (end == 1) == (self.direction == 1):
-                return self.edge[0]
-            return self.edge[1]
-
-        def start(self):
-            return self.endpoint(0)
-
-        def end(self):
-            return self.endpoint(1)
     
 
     def get_oriented_edge(self, start, end, label, crossing = None):
@@ -73,6 +79,9 @@ class TrainTrack(DiGraph):
     #         return self.get_oriented_edge(first_interval, 
     #                 separatrix.traversed_intervals[1], 'center',
     #                 crossing = separatrix.intersections[0])
+
+#xs    def _repr_(self):
+        
 
     def _latex_(self):
         r"""

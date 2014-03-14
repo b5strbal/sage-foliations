@@ -252,7 +252,7 @@ class Arc(SageObject):
 
 class TransverseCurve(SageObject):
     def __init__(self, sep1, sep2):
-        if (sep1.first_interval_end() == 0) == sep1.is_flipped():
+        if sep1.final_end() == 0:
             openness = ('closed','open')
         else:
             openness = ('open','closed')
