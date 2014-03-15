@@ -551,7 +551,12 @@ class Foliation(SageObject):
         preimage_of_zero = mod_one(-twist/totals[1])
         containing_int = bisect_left(self._divvalues[1], 
                 preimage_of_zero) % self.num_intervals(1)
-        self._gen_perm = self._rotated_gen_perm(0, -containing_int)
+
+        self._gen_perm = GeneralizedPermutation(self._gen_perm_list[0],
+                                self._gen_perm_list[1][containing_int:]+
+                               self._gen_perm_list[1][:containing_int], 
+                               flips = self.flips())
+        
         self._gen_perm_list = self._gen_perm.list()
         self._twist = mod_one(self._divvalues[1][containing_int] -
                 preimage_of_zero)
@@ -1284,46 +1289,6 @@ v            OUTPUT:
             p = point
             new_side = (side + 1) % 2
         return (p, self.in_which_interval(p, new_side))
-
-
-    def _rotated_gen_perm(self, top_rotation, bottom_rotation):
-        """
-        Returns an involution where the top and bottom rows
-        are rotated cyclically.
-
-        INPUT:
-
-        - ``top`` - an integer, shift the top letters
-          cyclically by this amount
-
-        - ``bottom`` - an integer, shift the bottom letters
-          cyclically by this amount
-
-        OUTPUT:
-
-        - Involution - the rotated Involution
-
-        EXAMPLES::
-
-            sage: i = Involution('a b c b','c a d d', \
-                    flips='bc');i
-            a -b -c -b
-            -c a d d
-            sage: i.rotated(1, 1)
-            -b a -b -c
-            d -c a d
-            sage: i.rotated(-6, 2)
-            -c -b a -b
-            d d -c a
-            
-        """
-        from collections import deque
-        labels = [deque(self.labels()[side]) for side in {0, 1}]
-        rotations = (top_rotation, bottom_rotation)
-        for side in {0, 1}:
-            labels[side].rotate(rotations[side])
-        return GeneralizedPermutation(list(labels[0]), list(labels[1]), 
-                flips = self.flips())
 
 
     def rotated(self, n):
