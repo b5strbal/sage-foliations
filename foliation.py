@@ -445,6 +445,7 @@ class Foliation(SageObject):
             bottom_letters = 'JOKER JOKER'
         self._gen_perm = GeneralizedPermutation(\
                 top_letters, bottom_letters, flips = flips)
+        self._gen_perm_list = self._gen_perm.list()
 
         # initializing self._index_of_label and self._pair
         self._all_intervals = [[], []]
@@ -453,7 +454,7 @@ class Foliation(SageObject):
         count = 0
         self._pair = {}
         for side in {0, 1}:
-            for index in range(len(self.labels()[side])):
+            for index in range(len(self._gen_perm_list[side])):
                 interval = self.Interval(side, index, self)
                 self._all_intervals[side].append(interval)
                 label = interval.label()
@@ -546,11 +547,12 @@ class Foliation(SageObject):
                 interval.side][-1] + self._lengths[interval.label()])
         for side in {0,1}:
             self._divvalues[side].pop()
-
+            
         preimage_of_zero = mod_one(-twist/totals[1])
         containing_int = bisect_left(self._divvalues[1], 
                 preimage_of_zero) % self.num_intervals(1)
         self._gen_perm = self._rotated_gen_perm(0, -containing_int)
+        self._gen_perm_list = self._gen_perm.list()
         self._twist = mod_one(self._divvalues[1][containing_int] -
                 preimage_of_zero)
         self._divvalues[1] = [self._twist]
@@ -574,7 +576,7 @@ class Foliation(SageObject):
         return len(self._gen_perm[side])
 
     def labels(self):
-        return self._gen_perm.list()
+        return self._gen_perm_list
 
     @property
     def train_track(self):
@@ -1323,37 +1325,20 @@ v            OUTPUT:
         return GeneralizedPermutation(list(labels[0]), list(labels[1]), 
                 flips = self.flips())
 
-    def _reversed_gen_perm(self):
-        """
-        Returns an involution where the top and bottom rows
-        are reversed.
 
-        OUTPUT:
+    def rotated(self, n):
+        from separatrix import Separatrix
+        separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
+        i = self._all_intervals[0][0]
+        i = i.add_to_position(-n)
+        return from_separatrices(separatrices, i.endpoint(0), 0)
 
-        - Involution - the reversed Involution
-
-        EXAMPLES::
-
-            sage: i = Involution('a b c b','c a d d', \
-                    flips='bc');i
-            a -b -c -b
-            -c a d d
-            sage: i.reversed()
-            -b -c -b a
-            d d a -c
-
-        """
-        from collections import deque
-        labels = [deque(self.labels()[side]) for side in {0, 1}]
-        for side in {0, 1}:
-            labels[side].reverse()
-        return GeneralizedPermutation(list(labels[0]), list(labels[1]), 
-                flips = self.flips())
-
-
-
-
-
+    def reversed(self):
+        from separatrix import Separatrix
+        separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
+        return from_separatrices(separatrices, 0, 0, direction = 'left')
+                                 
+                                 
 
 
 
@@ -1456,24 +1441,23 @@ v            OUTPUT:
             separatrices += Separatrix.get_all(self,
                                         stop_at_first_orientation_reverse=True)
 
-        return from_separatrices(separatrices, 0, 0, False,
+        return from_separatrices(separatrices, 0, 0,
                                  lift_type = foliation_or_surface)
         
 
 
 def from_separatrices(separatrices, starting_point, starting_side,
-                      is_one_sided, direction = 'right',
+                      is_one_sided = False, direction = 'right',
                       arc_length = 1, lift_type = None,
                       ):
     # foliation = separatrices[0][0].foliation
     # print separatrices
 
-    print separatrices
     separatrices = sorted_separatrices(separatrices, starting_point,
                                        starting_side, is_one_sided,
                                        direction)
 
-    print separatrices
+    # print separatrices
     flips = set()
     remaining_labels = range((len(separatrices[0]) +
                               len(separatrices[1]))/2, 0, -1)
@@ -1485,14 +1469,10 @@ def from_separatrices(separatrices, starting_point, starting_side,
     if gen_perm[1] == []:
         gen_perm[1] = 'moebius'
         twist = None
-        bottom_rotation = 0
     else:
         from bisect import bisect
         twist = mod_one(separatrices[1][0].endpoint -
                         separatrices[0][0].endpoint)
-        bottom_rotation = bisect([s.endpoint
-                                  for s in separatrices[1]],
-                                 separatrices[0][0].endpoint)
 
     # print separatrices
     for side in range(2):
@@ -1504,8 +1484,8 @@ def from_separatrices(separatrices, starting_point, starting_side,
                 paths[(side,i,end)] = \
                         get_pair_and_path(separatrices,
                                           side, i, end,
-                                          bottom_rotation,
-                                          lift_type)
+                                          lift_type,
+                                          direction)
 
             p = paths[(side, i, 0)]
             label = remaining_labels.pop()
@@ -1515,10 +1495,11 @@ def from_separatrices(separatrices, starting_point, starting_side,
 
             s1 = separatrices[side][i]
             s2 = separatrices[side][(i+1)%len(separatrices[side])]
+            if direction == 'left':
+                s1, s2 = s2, s1
             lengths[label] = mod_one(s2.endpoint - s1.endpoint)
-            if s1.end_side < s2.end_side:
+            if s1.end_side != s2.end_side:
                 lengths[label] -= 1 - arc_length
-
 
     fol = Foliation(*gen_perm, lengths = lengths,
                      flips = flips, twist = twist)
@@ -1555,15 +1536,18 @@ def from_separatrices(separatrices, starting_point, starting_side,
 
 PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 
-def get_pair_and_path(separatrices, side, i, end, bottom_rotation,
-                       lift_type):
+def get_pair_and_path(separatrices, side, i, end, 
+                       lift_type, direction):
 
     tt = separatrices[0][0].foliation.train_track
     s = separatrices[side][(i + end) % len(separatrices[side])]
+    if direction == 'left':
+        end = (end + 1) % 2
+    start_end = end
     if s.is_flipped():
         end = (end + 1) % 2
     
-    # converting first separatric to train track path
+    # converting first separatrix to train track path
     path = s.tt_path(end).reversed()
     interval = path[-1].end()
     # adding connecting interval to train track path
@@ -1576,30 +1560,32 @@ def get_pair_and_path(separatrices, side, i, end, bottom_rotation,
         end = (end + 1) % 2
     if end == 1:
         interval = interval.next()
+    is_flipped_so_far = start_end != end 
     new_side, new_i = matching_sep_index(separatrices,
                                               interval,
                                               lift_type,
-                                              end, side)
+                                              is_flipped_so_far, side)
     # converting second separatrix to train track path
     s = separatrices[new_side][new_i]
     path.append(s.tt_path(end))
 
     if s.is_flipped():
         end = (end + 1) % 2
+    if direction == 'left':
+        end = (end + 1) % 2
     if end == 1:
         new_i = (new_i - 1) % len(separatrices[new_side])
-    if new_side == 1:
-        new_i = (new_i - bottom_rotation) % len(separatrices[1])
     return PathEntry(new_side,new_i,end,path)
 
 
 
 
-def matching_sep_index(separatrices, interval, lift_type, end, orig_side):
+def matching_sep_index(separatrices, interval, lift_type,
+                       is_flipped_so_far, orig_side):
     for side in range(2):
         for j in range(len(separatrices[side])):
             s = separatrices[side][j]
-            is_total_flipped = (s.is_flipped() != (end==1))
+            is_total_flipped = (s.is_flipped() != is_flipped_so_far)
             # print is_total_flipped
             # print s.first_interval()
             # print s.endpoint
