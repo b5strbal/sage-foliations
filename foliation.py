@@ -1447,8 +1447,8 @@ v            OUTPUT:
             separatrices += Separatrix.get_all(self, number_of_flips_to_stop=1)
             # removing removable singularities
             separatrices = [s for s in separatrices
-                            if s.first_interval().prev() !=
-                            s.first_interval().pair()]
+                            if s.first_interval(0).prev() !=
+                            s.first_interval(0).pair()]
         elif foliation_or_surface == 'surface':
             separatrices += Separatrix.get_all(self,
                                         stop_at_first_orientation_reverse=True)
@@ -1550,8 +1550,6 @@ def get_pair_and_path(separatrices, side, i, end, bottom_rotation,
 
     tt = separatrices[0][0].foliation.train_track
     s = separatrices[side][(i + end) % len(separatrices[side])]
-    print s
-    assert(s.first_interval_end() == 0)
     if s.is_flipped():
         end = (end + 1) % 2
     
@@ -1596,7 +1594,7 @@ def matching_sep_index(separatrices, interval, lift_type, end, orig_side):
             # print s.first_interval()
             # print s.endpoint
             # print s.first_interval(), '\n'
-            if s.first_interval() == interval:
+            if s.first_interval(0) == interval:
                 
                 if lift_type == None or \
                    lift_type == 'foliation' and not is_total_flipped or \

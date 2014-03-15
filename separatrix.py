@@ -3,7 +3,7 @@ from foliation import mod_one
 from train_track import TrainTrack
 
 class Separatrix(SageObject):
-    def __init__(self, foliation, interval, end = 0, bounding_arc = None,
+    def __init__(self, foliation, interval, bounding_arc = None,
                  number_of_flips_to_stop = None,
                  stop_at_first_orientation_reverse = False):
         r"""
@@ -34,13 +34,12 @@ class Separatrix(SageObject):
         assert(not self._foliation.is_bottom_side_moebius() or 
                 interval.side == 0) # otherwise it is not a real separatrix
         self._flip_count = 0
-        self._end = end
-        p = interval.endpoint(end)
+        p = interval.endpoint(0)
         self._intersections = [p]
         self._tt_path = TrainTrack.Path()
         self._center_lengthen(p, interval)
 
-        other_int = interval.prev() if end == 0 else interval.next()
+        other_int = interval.prev()
         self._other_first_edge = self._tt.get_oriented_edge(other_int,
                                             self._tt_path[0].end(),
                                                              'center',p)
@@ -100,7 +99,7 @@ class Separatrix(SageObject):
                                                     'center', p))
                 
     def tt_path(self, end):
-        first_edge = self._tt_path[0] if end == self._end else \
+        first_edge = self._tt_path[0] if end == 0 else \
                 self._other_first_edge
         return TrainTrack.Path([first_edge] + self._tt_path[1:])
 
@@ -139,24 +138,27 @@ class Separatrix(SageObject):
             return 1
         return self._tt_path[-1].start().side
     
-    @property
-    def start_side(self):
-        return self._tt_path[0].start().side
+    # @property
+    # def start_side(self):
+    #     return self._tt_path[0].start().side
 
     @property
     def endpoint(self):
         return self._intersections[self._current_index]
 
-    def first_interval(self):
-        return self._tt_path[0].start()
+    def first_edge(self, end):
+        return self._tt_path[0] if end == 0 else self._other_first_edge
 
-    def first_interval_end(self):
-        return self._end
+    def first_interval(self, end):
+        return self.first_edge(end).start()
 
-    def final_end(self):
-        if not self.is_flipped():
-            return self._end
-        return (self._end + 1) % 2
+    # def first_interval_end(self):
+    #     return self._end
+
+    # def final_end(self):
+    #     if not self.is_flipped():
+    #         return self._end
+    #     return (self._end + 1) % 2
 
     def is_flipped(self):
         return self._flip_count % 2 == 1
@@ -165,7 +167,7 @@ class Separatrix(SageObject):
     def get_all(cls, foliation, bounding_arc = None,
                 number_of_flips_to_stop = None,
                 stop_at_first_orientation_reverse = False):
-        return [Separatrix(foliation, interval, 0, bounding_arc,
+        return [Separatrix(foliation, interval, bounding_arc,
                            number_of_flips_to_stop,
                            stop_at_first_orientation_reverse) for
                 interval in foliation.intervals()]
