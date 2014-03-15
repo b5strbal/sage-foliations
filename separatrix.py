@@ -138,9 +138,9 @@ class Separatrix(SageObject):
             return 1
         return self._tt_path[-1].start().side
     
-    # @property
-    # def start_side(self):
-    #     return self._tt_path[0].start().side
+    @property
+    def start_side(self):
+        return self._tt_path[0].start().side
 
     @property
     def endpoint(self):
@@ -173,14 +173,6 @@ class Separatrix(SageObject):
                 interval in foliation.intervals()]
 
 
-    @classmethod
-    def sorted_separatrices(cls, separatrices, starting_point = 0):
-        # xprint separatrices
-        return [sorted([s for s in separatrices if 
-                        s.end_side == side],
-                       key = lambda s: mod_one(s.endpoint -
-                                               starting_point))
-                for side in {0, 1}]
         
         
 

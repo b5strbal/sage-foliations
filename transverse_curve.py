@@ -302,14 +302,10 @@ class TransverseCurve(SageObject):
 
     def cut(self):
         foliation = self._sep[0].foliation
-        separatrices = Separatrix.sorted_separatrices(
-            Separatrix.get_all(foliation, self._arc), self._arc[0])
-            
-        if self.is_one_sided():
-            separatrices[0].extend(separatrices[1])
-            separatrices[1] = []
-                
-        return Foliation.from_separatrix(separatrices, self._arc.length())
+        separatrices = Separatrix.get_all(foliation, self._arc)
+               
+        from Foliation import from_separatrix
+        return from_separatrix(separatrices, self._arc.length())
 
     @classmethod
     def find_transverse_curves(cls, interval, end,

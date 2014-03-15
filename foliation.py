@@ -620,7 +620,10 @@ class Foliation(SageObject):
             self = super(Foliation.Interval, cls).__new__(cls, side, index)
             self._foliation = foliation
             return self
-
+            
+        def __repr__(self):
+            return repr((self.side, self.index))
+            
         def as_tuple(self):
             return (self.side, self.index)
 
@@ -1453,17 +1456,24 @@ v            OUTPUT:
             separatrices += Separatrix.get_all(self,
                                         stop_at_first_orientation_reverse=True)
 
-        return from_separatrices(Separatrix.sorted_separatrices(
-            separatrices), lift_type = foliation_or_surface)
+        return from_separatrices(separatrices, 0, 0, False,
+                                 lift_type = foliation_or_surface)
         
 
 
-def from_separatrices(separatrices,
+def from_separatrices(separatrices, starting_point, starting_side,
+                      is_one_sided, direction = 'right',
                       arc_length = 1, lift_type = None,
-                      left_antenna = None):
+                      ):
     # foliation = separatrices[0][0].foliation
     # print separatrices
 
+    print separatrices
+    separatrices = sorted_separatrices(separatrices, starting_point,
+                                       starting_side, is_one_sided,
+                                       direction)
+
+    print separatrices
     flips = set()
     remaining_labels = range((len(separatrices[0]) +
                               len(separatrices[1]))/2, 0, -1)
@@ -1604,3 +1614,28 @@ def matching_sep_index(separatrices, interval, lift_type, end, orig_side):
     
     # print interval
     assert(False)
+
+
+
+def sorted_separatrices(separatrices, starting_point, starting_side,
+                        is_one_sided, direction = 'right'):
+    def distance(sep):
+        if direction == 'right':
+            return  mod_one(sep.endpoint - starting_point)
+        else:
+            return mod_one(starting_point - sep.endpoint)
+        
+
+    seps = [sorted([s for s in separatrices if 
+                    s.end_side == side],
+                   key = distance)
+            for side in {0, 1}]
+
+    if starting_side == 1:
+        seps = reversed(seps)
+    
+    if is_one_sided:
+        seps[0].extend(seps[1])
+        seps[1] = []
+        
+    return seps
