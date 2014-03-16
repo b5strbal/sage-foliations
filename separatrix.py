@@ -98,11 +98,20 @@ class Separatrix(SageObject):
         self._tt_path.append(self._tt.get_oriented_edge(last_int, new_int,
                                                     'center', p))
                 
-    def tt_path(self, end):
+    def tt_path(self, end, endpoint = None):
         first_edge = self._tt_path[0] if end == 0 else \
                 self._other_first_edge
-        return TrainTrack.Path([first_edge] + self._tt_path[1:])
+        path = TrainTrack.Path([first_edge] + self._tt_path[1:])
+        if endpoint == None:
+            return path
 
+        cutting_index = 0
+        while self._intersections[cutting_index] != endpoint:
+            cutting_index += 1
+
+        if cutting_index % 2 == 1:
+            cutting_index -= 1
+        return path[:cutting_index+1]
 
     def _repr_(self):
         s = "Intersections: "

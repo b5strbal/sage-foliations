@@ -1296,12 +1296,12 @@ v            OUTPUT:
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
         i = self._all_intervals[0][0]
         i = i.add_to_position(-n)
-        return from_separatrices(separatrices, i.endpoint(0), 0)
+        return new_foliation(separatrices, i.endpoint(0), 0)
 
     def reversed(self):
         from separatrix import Separatrix
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
-        return from_separatrices(separatrices, 0, 0, direction = 'left')
+        return new_foliation(separatrices, 0, 0, direction = 'left')
                                  
                                  
 
@@ -1406,23 +1406,25 @@ v            OUTPUT:
             separatrices += Separatrix.get_all(self,
                                         stop_at_first_orientation_reverse=True)
 
-        return from_separatrices(separatrices, 0, 0,
-                                 lift_type = foliation_or_surface)
+        return new_foliation(separatrices, 0, 0,
+                                 lift_type = foliation_or_surface)[0]
         
 
 
-def from_separatrices(separatrices, starting_point, starting_side,
+def new_foliation(separatrices, starting_point, starting_side,
                       is_one_sided = False, direction = 'right',
-                      arc_length = 1, lift_type = None,
-                      ):
-    # foliation = separatrices[0][0].foliation
-    # print separatrices
-
+                      ending_point = None, lift_type = None):
     separatrices = sorted_separatrices(separatrices, starting_point,
                                        starting_side, is_one_sided,
                                        direction)
+    if ending_point == None:
+        arc_length = 1
+        ending_point = starting_point
+    elif direction == 'right':
+        arc_length = mod_one(ending_point - starting_point)
+    else:
+        arc_length = mod_one(starting_point - ending_point)
 
-    # print separatrices
     flips = set()
     remaining_labels = range((len(separatrices[0]) +
                               len(separatrices[1]))/2, 0, -1)
@@ -1430,27 +1432,30 @@ def from_separatrices(separatrices, starting_point, starting_side,
     lengths = {}
     paths = {}
 
-
     if gen_perm[1] == []:
         gen_perm[1] = 'moebius'
         twist = None
     else:
-        from bisect import bisect
         twist = mod_one(separatrices[1][0].endpoint -
                         separatrices[0][0].endpoint)
 
-    # print separatrices
+    # need only one path for each interval if it is a lift, becuase
+    # then we don't need the train track map. Otherwise both
+    # paths are needed.
+    num_paths = 1 if lift_type != None else 2
+    
     for side in range(2):
         for i in range(len(separatrices[side])):
             if gen_perm[side][i] != None:
                 continue
 
-            for end in range(2):
+            for end in range(num_paths):
                 paths[(side,i,end)] = \
                         get_pair_and_path(separatrices,
                                           side, i, end,
                                           lift_type,
-                                          direction)
+                                          direction,
+                                          ending_point)
 
             p = paths[(side, i, 0)]
             label = remaining_labels.pop()
@@ -1466,33 +1471,59 @@ def from_separatrices(separatrices, starting_point, starting_side,
             if s1.end_side != s2.end_side:
                 lengths[label] -= 1 - arc_length
 
-    fol = Foliation(*gen_perm, lengths = lengths,
-                     flips = flips, twist = twist)
-    return fol
-    old_fol = separatrices[0][0].foliation
-    tt_new = fol.train_track
+    return (Foliation(*gen_perm, lengths = lengths,
+                     flips = flips, twist = twist),
+            paths)
+
+
+def get_tt_map(old_fol, new_fol, paths):
+    tt_new = new_fol.train_track
     tt_old = old_fol.train_track
     vertex_map = {}
     edge_map = {}
 
-    for pe in paths:
-        for new_edge in tt_new.edges():
-            if new_edge[0].as_tuple() in [pe.start_int, pe.end_int]:
-                if new_edge[2] == 'pair':
-                    new_path = TrainTrack.Path(pe.path.oriented_edge_list[1:-1])
-                    if new_edge[0].as_tuple() == pe.end_int:
-                        new_path = new_path.reversed()
-                elif new_edge[2] == 'center':
-                    if new_edge[0].as_tuple() == pe.end_int:
-                        new_path = TrainTrack.Path(pe.path[-1])
-                        # need to consider the case when end=1 for the second separatrix
-                    else:
-                        new_path = TrainTrack.Path(pe.path[0].reversed())
-                    # need to consider the case when the strip hits the
-                    # corner of the transverse curve
-                edge_map[new_edge] = new_path
+    # finding the strip which is not rectangular but L-shaped
+    # more specifically, the long vertical end of it
+    if not new_fol.is_bottom_side_moebius():
+        long_path = (1, new_fol.num_intervals(1) - 1, 0)
+    else:
+        for interval in new_fol.intervals():
+            if interval.contains(0.5):
+                long_path = (0, interval.index, 1)
+                break
+
+    for interval in new_fol.intervals():
+        if not (*interval.as_tuple(), 0) in paths:
+            continue
+        pe = [paths[(*interval.as_tuple(), i)] for i in range(2)]
+        long_end = None
+        for i in range(2):
+            if (*interval.as_tuple(), i) == long_path:
+                long_end = (0, i)
+                break
+            if (pe[i].new_side, pe[i].new_end, i) == long_path:
+                long_end = (1, i)
+                break
+        
+        a0, a1, center, b0, b1 = break_apart(pe, long_end)
+        vertex_map[interval] = a0[-1].end()
+        vertex_map[interval.pair()] = b0[0].start()
+        edge_map[TrainTrack.get_oriented_edge(interval,
+                                        interval.pair(), 'pair')] = center
+        
+        TODO: rewrite the TrainTrack class and then finish getting the edges.
 
 
+def break_apart(paths, long_end = None):
+    diff = abs(len(paths[0]) - len(paths[1]))
+    cuts = [[1, 1], [-1, -1]]
+    if long_end != None:
+        cuts[long_end[0]][long_end[1]] += diff * (-1)**long_end[1]
+    return (paths[0][:cuts[0][0]], paths[1][:cuts[1][0]],
+            paths[0][cuts[0][0]:cuts[0][1]],
+            paths[0][cuts[0][1]:], paths[1][cuts[1][1]:])
+        
+            
 
 
 
@@ -1502,7 +1533,7 @@ def from_separatrices(separatrices, starting_point, starting_side,
 PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 
 def get_pair_and_path(separatrices, side, i, end, 
-                       lift_type, direction):
+                       lift_type, direction, ending_point):
 
     tt = separatrices[0][0].foliation.train_track
     s = separatrices[side][(i + end) % len(separatrices[side])]
@@ -1512,8 +1543,15 @@ def get_pair_and_path(separatrices, side, i, end,
     if s.is_flipped():
         end = (end + 1) % 2
     
+    # on the last right end of the last interval on the top side,
+    # the traintrack path has to be cut off early
+    if (side, i, end) == (0, len(separatrices[0]) - 1, 1):
+        endpoint = ending_point
+    else:
+        endpoint = None
+
     # converting first separatrix to train track path
-    path = s.tt_path(end).reversed()
+    path = s.tt_path(end, endpoint).reversed()
     interval = path[-1].end()
     # adding connecting interval to train track path
     interval2 = interval.pair()
@@ -1530,9 +1568,8 @@ def get_pair_and_path(separatrices, side, i, end,
                                               interval,
                                               lift_type,
                                               is_flipped_so_far, side)
-    # converting second separatrix to train track path
     s = separatrices[new_side][new_i]
-    path.append(s.tt_path(end))
+
 
     if s.is_flipped():
         end = (end + 1) % 2
@@ -1540,8 +1577,18 @@ def get_pair_and_path(separatrices, side, i, end,
         end = (end + 1) % 2
     if end == 1:
         new_i = (new_i - 1) % len(separatrices[new_side])
-    return PathEntry(new_side,new_i,end,path)
 
+    # again, on the last right end of the last interval on the top side,
+    # the traintrack path has to be cut off early
+    if (new_side, new_i, end) == (0, len(separatrices[0]) - 1, 1):
+        endpoint = ending_point
+    else:
+        endpoint = None
+
+    # converting second separatrix to train track path
+    path.append(s.tt_path(end, endpoint))
+
+    return PathEntry(new_side,new_i,end,path)
 
 
 
