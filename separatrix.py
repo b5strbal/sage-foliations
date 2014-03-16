@@ -111,7 +111,7 @@ class Separatrix(SageObject):
 
         if cutting_index % 2 == 1:
             cutting_index -= 1
-        return path[:cutting_index+1]
+        return TrainTrack.Path(path[:cutting_index+1])
 
     def _repr_(self):
         s = "Intersections: "

@@ -443,60 +443,7 @@ class Foliation(SageObject):
 
         if bottom_letters == 'moebius': # bottom side is Moebius
             bottom_letters = 'JOKER JOKER'
-        self._gen_perm = GeneralizedPermutation(\
-                top_letters, bottom_letters, flips = flips)
-        self._gen_perm_list = self._gen_perm.list()
-
-        # initializing self._index_of_label and self._pair
-        self._all_intervals = [[], []]
-        label_to_interval = {}
-        self._index_of_label = {}
-        count = 0
-        self._pair = {}
-        for side in {0, 1}:
-            for index in range(len(self._gen_perm_list[side])):
-                interval = self.Interval(side, index, self)
-                self._all_intervals[side].append(interval)
-                label = interval.label()
-                if label not in self._index_of_label:
-                    self._index_of_label[label] = count
-                    count += 1
-                    label_to_interval[label] = interval
-                else:
-                    self._pair[label_to_interval[label]] = interval
-                    self._pair[interval] = label_to_interval[label]
-
-
-        # initializing self._singularity_partition
-        done = set()
-        partition = []
-        for interval in self.intervals():
-            if interval in done:
-                continue
-            new_interval = interval
-            partition.append([])
-            direction = 'left'
-            while True:
-                if direction == 'left':
-                    new_interval = new_interval.prev().pair()
-                    if not new_interval.is_flipped():
-                        new_interval = new_interval.next()
-                        direction = 'away'
-                else:
-                    new_interval = new_interval.pair()
-                    if not new_interval.is_flipped():
-                        direction = 'left'
-                    else:
-                        new_interval = new_interval.next()
-                partition[-1].append(new_interval)
-                done.add(new_interval)
-                if interval == new_interval:
-                    break
-
-        self._singularity_partition = partition
-
-
-
+        self._init_gen_perm(top_letters, bottom_letters, flips)
 
         
         from bisect import bisect_left
@@ -547,30 +494,84 @@ class Foliation(SageObject):
                 interval.side][-1] + self._lengths[interval.label()])
         for side in {0,1}:
             self._divvalues[side].pop()
-            
+
         preimage_of_zero = mod_one(-twist/totals[1])
         containing_int = bisect_left(self._divvalues[1], 
                 preimage_of_zero) % self.num_intervals(1)
-
-        self._gen_perm = GeneralizedPermutation(self._gen_perm_list[0],
-                                self._gen_perm_list[1][containing_int:]+
-                               self._gen_perm_list[1][:containing_int], 
-                               flips = self.flips())
         
-        self._gen_perm_list = self._gen_perm.list()
+        self._init_gen_perm(self._gen_perm_list[0],
+                            self._gen_perm_list[1][containing_int:]+
+                            self._gen_perm_list[1][:containing_int], 
+                            flips = self.flips())
         self._twist = mod_one(self._divvalues[1][containing_int] -
                 preimage_of_zero)
         self._divvalues[1] = [self._twist]
-        for interval in self._all_intervals[1]:
+        for interval in self._all_intervals[1][:-1]:
             self._divvalues[1].append(self._divvalues[1][-1] + 
                     interval.length())
-
+        
         self._length_twist_vector = [0] * len(self._lengths)
         self._length_twist_vector.append(self._twist)
         for label in self._lengths:
             self._length_twist_vector[self.index_of_label(label)]\
                     = self._lengths[label]
         self._length_twist_vector = vector(self._length_twist_vector)
+
+
+        # initializing self._singularity_partition
+        done = set()
+        partition = []
+        for interval in self.intervals():
+            if interval in done:
+                continue
+            new_interval = interval
+            partition.append([])
+            direction = 'left'
+            while True:
+                if direction == 'left':
+                    new_interval = new_interval.prev().pair()
+                    if not new_interval.is_flipped():
+                        new_interval = new_interval.next()
+                        direction = 'away'
+                else:
+                    new_interval = new_interval.pair()
+                    if not new_interval.is_flipped():
+                        direction = 'left'
+                    else:
+                        new_interval = new_interval.next()
+                partition[-1].append(new_interval)
+                done.add(new_interval)
+                if interval == new_interval:
+                    break
+
+        self._singularity_partition = partition
+
+    def _init_gen_perm(self, top_letters, bottom_letters, flips):
+        self._gen_perm = GeneralizedPermutation(\
+                        top_letters, bottom_letters, flips = flips)
+        self._gen_perm_list = self._gen_perm.list()
+
+        # initializing self._index_of_label and self._pair
+        self._all_intervals = [[], []]
+        label_to_interval = {}
+        self._index_of_label = {}
+        count = 0
+        self._pair = {}
+        for side in {0, 1}:
+            for index in range(len(self._gen_perm_list[side])):
+                interval = self.Interval(side, index, self)
+                self._all_intervals[side].append(interval)
+                label = interval.label()
+                if label not in self._index_of_label:
+                    self._index_of_label[label] = count
+                    count += 1
+                    label_to_interval[label] = interval
+                else:
+                    self._pair[label_to_interval[label]] = interval
+                    self._pair[interval] = label_to_interval[label]
+
+
+
 
     def intervals(self):
         if self.is_bottom_side_moebius():
@@ -735,7 +736,7 @@ class Foliation(SageObject):
 
             """
             side, index = self._foliation._pair[(self.side, self.index)]
-            return Foliation.Interval(side, index, self._foliation)
+            return self._foliation._all_intervals[side][index]
 
         def which_singularity(self):
             """
@@ -1296,12 +1297,14 @@ v            OUTPUT:
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
         i = self._all_intervals[0][0]
         i = i.add_to_position(-n)
-        return new_foliation(separatrices, i.endpoint(0), 0)
+        new_fol, paths = new_foliation(separatrices, i.endpoint(0), 0)
+        return (new_fol, get_tt_map(self, new_fol, paths))
 
     def reversed(self):
         from separatrix import Separatrix
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
-        return new_foliation(separatrices, 0, 0, direction = 'left')
+        new_fol, paths = new_foliation(separatrices, 0, 0, direction = 'left')
+        return (new_fol, get_tt_map(self, new_fol, paths))
                                  
                                  
 
@@ -1430,7 +1433,7 @@ def new_foliation(separatrices, starting_point, starting_side,
                               len(separatrices[1]))/2, 0, -1)
     gen_perm = [[None] * len(separatrices[i]) for i in range(2)]
     lengths = {}
-    paths = {}
+    path_entries = {}
 
     if gen_perm[1] == []:
         gen_perm[1] = 'moebius'
@@ -1438,26 +1441,28 @@ def new_foliation(separatrices, starting_point, starting_side,
     else:
         twist = mod_one(separatrices[1][0].endpoint -
                         separatrices[0][0].endpoint)
+        if direction == 'left':
+            twist = 1 - twist
 
     # need only one path for each interval if it is a lift, becuase
     # then we don't need the train track map. Otherwise both
-    # paths are needed.
-    num_paths = 1 if lift_type != None else 2
+    # path_entries are needed.
+    num_path_entries = 1 if lift_type != None else 2
     
     for side in range(2):
         for i in range(len(separatrices[side])):
             if gen_perm[side][i] != None:
                 continue
 
-            for end in range(num_paths):
-                paths[(side,i,end)] = \
+            for end in range(num_path_entries):
+                path_entries[(side,i,end)] = \
                         get_pair_and_path(separatrices,
                                           side, i, end,
                                           lift_type,
                                           direction,
                                           ending_point)
 
-            p = paths[(side, i, 0)]
+            p = path_entries[(side, i, 0)]
             label = remaining_labels.pop()
             if p.new_end == 1:
                 flips.add(label)
@@ -1471,12 +1476,14 @@ def new_foliation(separatrices, starting_point, starting_side,
             if s1.end_side != s2.end_side:
                 lengths[label] -= 1 - arc_length
 
-    return (Foliation(*gen_perm, lengths = lengths,
-                     flips = flips, twist = twist),
-            paths)
+    new_fol = Foliation(*gen_perm, lengths = lengths,
+                     flips = flips, twist = twist)
+    return (new_fol, path_entries)
 
 
-def get_tt_map(old_fol, new_fol, paths):
+
+def get_tt_map(old_fol, new_fol, path_entries):
+    from train_track import TrainTrack
     tt_new = new_fol.train_track
     tt_old = old_fol.train_track
     vertex_map = {}
@@ -1487,36 +1494,41 @@ def get_tt_map(old_fol, new_fol, paths):
     if not new_fol.is_bottom_side_moebius():
         long_path = (1, new_fol.num_intervals(1) - 1, 0)
     else:
-        for interval in new_fol.intervals():
-            if interval.contains(0.5):
-                long_path = (0, interval.index, 1)
-                break
+        side, pos = new_fol.in_which_interval(0.5, 0)
+        long_path = (0, pos, 0)
+        
 
     for interval in new_fol.intervals():
-        if not (*interval.as_tuple(), 0) in paths:
+        x1, x2 = interval.as_tuple()
+        if not (x1, x2, 0) in path_entries:
             continue
-        pe = [paths[(*interval.as_tuple(), i)] for i in range(2)]
+        pe = [path_entries[(x1, x2, i)] for i in range(2)]
         long_end = None
         for i in range(2):
-            if (*interval.as_tuple(), i) == long_path:
-                long_end = (0, i)
+            if (x1, x2, i) == long_path:
+                long_end = (i, 0)
                 break
             if (pe[i].new_side, pe[i].new_end, i) == long_path:
-                long_end = (1, i)
+                long_end = (i, 1)
                 break
         
-        a0, a1, center, b0, b1 = break_apart(pe, long_end)
-        vertex_map[interval] = a0[-1].end()
-        vertex_map[interval.pair()] = b0[0].start()
-        edge_map[TrainTrack.get_oriented_edge(interval,
-                                        interval.pair(), 'pair')] = center
+        a0, a1, center, b0, b1 = break_apart([pe[0].path,pe[1].path], long_end)
+        v0 = vertex_map[interval] = a0[-1].end()
+        v1 = vertex_map[interval.pair()] = b0[0].start()
+        edge_map[tt_new.get_edge_from(interval, 'pair')] = TrainTrack.Path(center)
+        edge_map[tt_new.get_edge_from(v0, 'center')] = TrainTrack.Path(a0).reversed()
+        b = b1 if interval.is_flipped() else b0
+        edge_map[tt_new.get_edge_from(v1, 'center')] = TrainTrack.Path(b)
         
-        TODO: rewrite the TrainTrack class and then finish getting the edges.
+    return TrainTrack.Map(domain = new_fol,
+                          codomain = old_fol,
+                          vertex_map = vertex_map,
+                          edge_map = edge_map)
 
 
 def break_apart(paths, long_end = None):
     diff = abs(len(paths[0]) - len(paths[1]))
-    cuts = [[1, 1], [-1, -1]]
+    cuts = [[1, -1], [1, -1]]
     if long_end != None:
         cuts[long_end[0]][long_end[1]] += diff * (-1)**long_end[1]
     return (paths[0][:cuts[0][0]], paths[1][:cuts[1][0]],
@@ -1534,14 +1546,9 @@ PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 
 def get_pair_and_path(separatrices, side, i, end, 
                        lift_type, direction, ending_point):
-
     tt = separatrices[0][0].foliation.train_track
     s = separatrices[side][(i + end) % len(separatrices[side])]
-    if direction == 'left':
-        end = (end + 1) % 2
-    start_end = end
-    if s.is_flipped():
-        end = (end + 1) % 2
+
     
     # on the last right end of the last interval on the top side,
     # the traintrack path has to be cut off early
@@ -1550,14 +1557,20 @@ def get_pair_and_path(separatrices, side, i, end,
     else:
         endpoint = None
 
+    if direction == 'left':
+        end = (end + 1) % 2
+    start_end = end
+    if s.is_flipped():
+        end = (end + 1) % 2
+
     # converting first separatrix to train track path
     path = s.tt_path(end, endpoint).reversed()
     interval = path[-1].end()
     # adding connecting interval to train track path
     interval2 = interval.pair()
     path.append(tt.get_oriented_edge(interval,
-                                             interval2,
-                                             'pair'))
+                                     interval2,
+                                     'pair'))
     interval = interval2
     if interval.is_flipped():
         end = (end + 1) % 2
@@ -1586,7 +1599,7 @@ def get_pair_and_path(separatrices, side, i, end,
         endpoint = None
 
     # converting second separatrix to train track path
-    path.append(s.tt_path(end, endpoint))
+    path.extend(s.tt_path(end if direction == 'right' else (end + 1)%2, endpoint))
 
     return PathEntry(new_side,new_i,end,path)
 
@@ -1598,10 +1611,6 @@ def matching_sep_index(separatrices, interval, lift_type,
         for j in range(len(separatrices[side])):
             s = separatrices[side][j]
             is_total_flipped = (s.is_flipped() != is_flipped_so_far)
-            # print is_total_flipped
-            # print s.first_interval()
-            # print s.endpoint
-            # print s.first_interval(), '\n'
             if s.first_interval(0) == interval:
                 
                 if lift_type == None or \
@@ -1610,7 +1619,6 @@ def matching_sep_index(separatrices, interval, lift_type,
                    (s.end_side == orig_side) == is_total_flipped:
                     return (side, j)
     
-    # print interval
     assert(False)
 
 

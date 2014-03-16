@@ -1,4 +1,4 @@
-
+from sage.structure.sage_object import SageObject
 from sage.graphs.digraph import DiGraph
 from foliation import mod_one
 from collections import namedtuple
@@ -26,17 +26,16 @@ class OrientedEdge(namedtuple('OrientedEdge', 'edge, direction')):
         return self.edge[0]
 
 
-class TrainTrack(DiGraph):
+class TrainTrack(SageObject):
     def __init__(self, foliation):
         self._foliation = foliation
-        DiGraph.__init__(self, multiedges = True)
 
+        self._from = {'pair' : {}, 'center' : {}}
         done = set()
         for interval in foliation.intervals():
             if not interval in done:
                 pair = interval.pair()
-                self.add_edge(interval, pair, 'pair')
-                done.add(interval)
+                self._from['pair'][interval] = pair
                 done.add(pair)
 
         for interval in foliation.intervals():
@@ -47,41 +46,34 @@ class TrainTrack(DiGraph):
             else:
                 containing_int = foliation.in_which_interval(\
                         mod_one(interval.endpoint(0) + 0.5), 0)
-            self.add_edge(interval, containing_int, 'center')
+            self._from['center'][interval] = containing_int
+
 
     @property
     def foliation():
         return self._foliation
 
-    
+    def get_edge_from(self, from_vertex, edge_type):
+        return (from_vertex, self._from[edge_type][from_vertex], edge_type)
 
-    def get_oriented_edge(self, start, end, label, crossing = None):
-        has_forward = self.has_edge(start, end, label)
-        has_backwards = self.has_edge(end, start, label)
-        assert(has_forward or has_backwards)
-        if not has_forward:
-            return OrientedEdge((end, start, label), -1)
-        if not has_backwards:
-            return OrientedEdge((start, end, label), 1)
-        top_interval = start if start.side == 0 else end
-        if (crossing < top_interval.midpoint()) == (start.side == 0):
-            return OrientedEdge((start, end, label), 1)
-        return OrientedEdge((end, start, label), -1)
-
-    # def get_first_edge(self, separatrix, left_or_right):
-    #     first_interval = separatrix.traversed_intervals[0]
-    #     if left_or_right == 'left':
-    #         first_interval = first_interval.prev()
-    #     if self._foliation.is_bottom_side_moebius():
-    #         return self.get_oriented_edge(first_interval, 
-    #                 separatrix.traversed_intervals[3], 'center')
-    #     else:
-    #         return self.get_oriented_edge(first_interval, 
-    #                 separatrix.traversed_intervals[1], 'center',
-    #                 crossing = separatrix.intersections[0])
-
-#xs    def _repr_(self):
-        
+    def get_oriented_edge(self, from_vertex, to_vertex, edge_type,
+                          crossing = None):
+        v = [from_vertex, to_vertex]
+        candidates = [OrientedEdge((v[i], v[(i+1)%2], edge_type),
+                                   (-1)**i)
+                      for i in range(2)
+                      if v[i] in self._from[edge_type] and
+                      self._from[edge_type][v[i]] == v[(i+1)%2]]
+        if len(candidates) == 1:
+            return candidates[0]
+        elif len(candidates) == 2:
+            top_interval = from_vertex if from_vertex.side == 0 else to_vertex
+            if (crossing < top_interval.midpoint()) == (from_vertex.side == 0):
+                return candidates[0]
+            return candidates[1]
+            
+        assert(False)
+            
 
     def _latex_(self):
         r"""
@@ -97,6 +89,13 @@ class TrainTrack(DiGraph):
         def reversed(self):
             return TrainTrack.Path([oe.reversed() for 
                             oe in reversed(self)])
+
+        # def __getitem__(self, index):
+        #     result = list.__getitem__(self, index)
+        #     try:
+        #         return TrainTrack.Path(result)
+        #     except TypeError:
+        #         return result
 
         # def __add__(self, other):
         #     return TrainTrack.Path(self.oriented_edge_list +
