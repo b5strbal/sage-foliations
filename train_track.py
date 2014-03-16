@@ -2,6 +2,8 @@ from sage.structure.sage_object import SageObject
 from sage.graphs.digraph import DiGraph
 from foliation import mod_one
 from collections import namedtuple
+from sage.matrix.constructor import matrix
+from sage.rings.integer_ring import ZZ
 
 class OrientedEdge(namedtuple('OrientedEdge', 'edge, direction')):
     def __new__(cls, edge, direction):
@@ -66,12 +68,12 @@ class TrainTrack(SageObject):
     def foliation(self):
         return self._foliation
 
-    def _kernel_from_singularities(self):
+    def edges(self):
+        return self._index_to_edge # list
+
+    def kernel_from_singularities(self):
         circles = self.foliation.paths_around_singularities
-        result = []
-        for circle in circles:
-            result.append(self.path_to_vector(circle, signed = True))
-        return result
+        return [self.path_to_vector(circle, signed = True) for circle in circles]
 
     def get_edge_from(self, from_vertex, edge_type):
         return (from_vertex, self._from[edge_type][from_vertex], edge_type)
@@ -159,7 +161,18 @@ class TrainTrack(SageObject):
                     new_path.extend(p.reversed())
             return TrainTrack.Path(new_path)
             
-        
+        def _cohomology_kernel(self):
+            # this only works if domain and codomain are combinatorically same
+            # the underlying foliations need not be the same
+            tt = self.domain
+            
+            m = matrix([tt.path_to_vector(self.edge_map[edge], signed = True)
+                        for edge in tt.edges()])
+            m = m.transpose() - matrix.identity(ZZ, m.nrows())
+            mlist = m.rows()
+            mlist.extend(tt.kernel_from_singularities())
+            return matrix(mlist)
+                
                                   
                                 
                                   
