@@ -31,12 +31,22 @@ class TrainTrack(SageObject):
         self._foliation = foliation
 
         self._from = {'pair' : {}, 'center' : {}}
-        done = set()
+        self._vertex_to_index = {}
+        self._index_to_vertex = foliation.intervals()
+        self._edge_to_index = {}
+        self._index_to_edge = []
+        vertex_count = 0
+        edge_count = 0
         for interval in foliation.intervals():
-            if not interval in done:
+            self._vertex_to_index[interval] = vertex_count
+            vertex_count += 1
+            if not interval in self._from['pair'].values():
                 pair = interval.pair()
                 self._from['pair'][interval] = pair
-                done.add(pair)
+                edge = (interval, pair, 'pair')
+                self._edge_to_index[edge] = edge_count
+                self._index_to_edge.append(edge)
+                edge_count += 1
 
         for interval in foliation.intervals():
             if not foliation.is_bottom_side_moebius():
@@ -47,14 +57,32 @@ class TrainTrack(SageObject):
                 containing_int = foliation.in_which_interval(\
                         mod_one(interval.endpoint(0) + 0.5), 0)
             self._from['center'][interval] = containing_int
-
+            edge = (interval, containing_int, 'center')
+            self._edge_to_index[edge] = edge_count
+            self._index_to_edge.append(edge)
+            edge_count += 1
 
     @property
-    def foliation():
+    def foliation(self):
         return self._foliation
+
+    def _kernel_from_singularities(self):
+        circles = self.foliation.paths_around_singularities
+        result = []
+        for circle in circles:
+            result.append(self.path_to_vector(circle, signed = True))
+        return result
 
     def get_edge_from(self, from_vertex, edge_type):
         return (from_vertex, self._from[edge_type][from_vertex], edge_type)
+        
+    def get_center_edge(self, from_vertex, end):
+        if end == 0:
+            return OrientedEdge(self.get_edge_from(from_vertex, 'center'), 1)
+        other_int = self._from['center'][from_vertex.next()]
+        return self.get_oriented_edge(from_vertex, other_int, 'center',
+                                      from_vertex.endpoint(1))
+
 
     def get_oriented_edge(self, from_vertex, to_vertex, edge_type,
                           crossing = None):
@@ -73,7 +101,13 @@ class TrainTrack(SageObject):
             return candidates[1]
             
         assert(False)
-            
+
+    def path_to_vector(self, path, signed):
+        result = [0] * len(self._index_to_edge)
+        for oe in path:
+            result[self._edge_to_index[oe.edge]] += oe.direction \
+                                    if signed else 1
+        return result
 
     def _latex_(self):
         r"""
