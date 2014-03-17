@@ -75,6 +75,17 @@ class TrainTrack(SageObject):
         circles = self.foliation.paths_around_singularities
         return [self.path_to_vector(circle, signed = True) for circle in circles]
 
+    def coboundary_map_from_vertices(self):
+        m = matrix(ZZ, len(self._index_to_edge), len(self._index_to_vertex))
+        for i in range(len(self._index_to_edge)):
+            e = self._index_to_edge[i]
+            m[i, self._vertex_to_index[e[0]]] -= 1
+            m[i, self._vertex_to_index[e[1]]] += 1
+        return m
+            
+            
+        
+
     def get_edge_from(self, from_vertex, edge_type):
         return (from_vertex, self._from[edge_type][from_vertex], edge_type)
         
@@ -171,10 +182,38 @@ class TrainTrack(SageObject):
             m = m.transpose() - matrix.identity(ZZ, m.nrows())
             mlist = m.rows()
             mlist.extend(tt.kernel_from_singularities())
-            return matrix(mlist)
+            return matrix(mlist).right_kernel_matrix()
                 
-                                  
-                                
+        def invariant_cohomology(self):
+            # rows generate the kernel
+            M = self._cohomology_kernel()
+            C = self.domain.coboundary_map_from_vertices()
+            D, U, V = C.smith_form() # D = U * C * V
+
+            # Modifying U in the smith form such that D is a diagonal matrix
+            # where the non-zero rows are in the end instead of at the beginning
+            U = matrix(list(reversed(U.rows())))
+
+            F = M * U.transpose()
+            k = C.rank() 
+            # The first k columns of F are killed by the image of c
+            # after the normalization of U. 
+            # So we just have to echelonize, and drop all the rows where non-zero
+            # elements appear only in the last k columns, and renormalize.
+            F.echelonize()
+            col = 0
+            for row in range(F.nrows()):
+                while col < F.ncols() - k and F[row,col]==0:
+                    col += 1
+                if col == F.ncols() - k:
+                    break
+                col += 1
+            # cutting off unnecessary rows
+            F = matrix(F.rows()[:row])
+            if F.nrows() == 0:
+                return F
+            M = F * U.transpose().inverse()
+            return M
                                   
 
 

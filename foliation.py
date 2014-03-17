@@ -533,10 +533,11 @@ class Foliation(SageObject):
             edge_circles.append([])
             end = 0 # we start from the left side of the interval
             while True:
-                if end == 0:
-                    partition[-1].append(new_interval)
-                else:
-                    partition[-1].append(new_interval.next())
+                sing_index = new_interval if end == 0 else new_interval.next()
+                if sing_index == interval and len(partition[-1]) > 0:
+                    break
+                done.add(sing_index)
+                partition[-1].append(sing_index)
                 edge_circles[-1].append(tt.get_center_edge(new_interval, end))
                 end = (end + 1) % 2
                 new_interval = new_interval.add_to_position((-1)**end)
@@ -546,9 +547,6 @@ class Foliation(SageObject):
                 new_interval = new_interval.pair()
                 if new_interval.is_flipped():
                     end = (end + 1) % 2
-                done.add(new_interval)
-                if interval == new_interval:
-                    break
                 
         self._singularity_partition = partition
         self._paths_around_singularities = edge_circles
