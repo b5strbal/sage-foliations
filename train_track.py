@@ -1,9 +1,9 @@
 from sage.structure.sage_object import SageObject
-from sage.graphs.digraph import DiGraph
 from foliation import mod_one
 from collections import namedtuple
 from sage.matrix.constructor import matrix
 from sage.rings.integer_ring import ZZ
+from mymath import is_perron_frobenius
 
 class OrientedEdge(namedtuple('OrientedEdge', 'edge, direction')):
     def __new__(cls, edge, direction):
@@ -67,6 +67,9 @@ class TrainTrack(SageObject):
     @property
     def foliation(self):
         return self._foliation
+
+    def vertices(self):
+        return self._index_to_vertex
 
     def edges(self):
         return self._index_to_edge # list
@@ -215,5 +218,14 @@ class TrainTrack(SageObject):
             M = F * U.transpose().inverse()
             return M
                                   
+        def edge_matrix(self):
+            if not hasattr(self, '_edge_matrix'):
+                tt = self.domain
+                self._edge_matrix = matrix([tt.path_to_vector(self.edge_map[edge],
+                                                              signed = False)
+                                            for edge in tt.edges()])
+            return self._edge_matrix
 
-
+            
+        def is_pseudo_anosov(self):
+            return is_perron_frobenius(self.edge_matrix())

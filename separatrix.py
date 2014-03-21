@@ -115,11 +115,7 @@ class Separatrix(SageObject):
 
     def _repr_(self):
         s = "Intersections: "
-        if self._current_index == -2:
-            s += repr(self._intersections[:self._current_index+1])
-        else:
-            s += repr(self._intersections)
-        
+        s += repr(self.intersections())
         # s += "\nTrain Track Path: " + repr(self._tt_path)
         s += "\nTraversed intervals; "
         for oriented_edge in self._tt_path:
@@ -128,9 +124,12 @@ class Separatrix(SageObject):
         s += "\nFlips: " + repr(self._flip_count)
         return s
 
-    @property
     def intersections(self):
-        return self._intersections
+        if self._current_index == -2:
+            return self._intersections[:self._current_index+1]
+        else:
+            return self._intersections
+
 
     @property
     def foliation(self):
@@ -150,6 +149,10 @@ class Separatrix(SageObject):
     @property
     def start_side(self):
         return self._tt_path[0].start().side
+
+    # @property
+    # def start_point(self):
+    #     return self._intersections[0]
 
     @property
     def endpoint(self):

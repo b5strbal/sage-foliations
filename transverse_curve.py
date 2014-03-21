@@ -1,3 +1,6 @@
+from separatrix import Separatrix
+
+
 class Arc(SageObject):
     """
     An interval of the unit interval $[0,1]$ with opposite sides 
@@ -251,17 +254,21 @@ class Arc(SageObject):
 
 
 class TransverseCurve(SageObject):
-    def __init__(self, sep1, sep2):
-        if sep1.final_end() == 0:
-            openness = ('closed','open')
-        else:
-            openness = ('open','closed')
-        self._arc = Arc(sep1.endpoint(), sep2.endpoint(), *openness)
+    def __init__(self, sep1, openness1, sep2, openness2):
+        self._arc = Arc(sep1.endpoint, sep2.endpoint, openness1, openness2)
         self._sep = [sep1, sep2]
+        self._direction = 'right' if openness1 == 'closed' else 'left'
 
+    def _repr_(self):
+        s = ''
+        s += 'Arc: ' + repr(self._arc) + '(' + repr(self._arc.length()) + ')'
+        return s
+
+    def coding(self):
+        return (self._sep[0])
 
     @classmethod
-    def get_transverse_curves(cls, sep1, sep2):
+    def get_transverse_curves(cls, sep1, end1, sep2, end2):
         r"""
         
         INPUT:
@@ -272,21 +279,29 @@ class TransverseCurve(SageObject):
 
         """
         sep = [sep1, sep2]
+        ends = [end1, end2]
         # Checking if the curve is transverse
-        if not (sep1.is_flipped() == sep2.is_flipped() == \
-           sep1.traversed_intervals[0].is_flipped()):
+        if (sep1.is_flipped() != sep2.is_flipped() != \
+                sep1.first_interval(end1).is_flipped()):
             return []
             
-        # If the separatrices are short, both arcs are good
-        if len(sep1.intersections) == 1 and len(sep2.intersections) == 1:
-            return [TransverseCurve(sep1, sep2), TransverseCurve(sep2, sep1)]
+        if sep1.is_flipped() == (end1 == 1):
+            openness = ('open','closed')
+        else:
+            openness = ('closed','open')
                            
         # Checking if one of the arcs is simple        
-        arcs = [Arc(sep[i].endpoint(), sep[(i+1)%2].endpoint(),
-                    'open', 'open') for i in range(2)] 
+        arcs = [Arc(sep[i].endpoint, sep[(i+1)%2].endpoint,
+                    *openness) for i in range(2)]
         good_indices = [0,1]
+        for i in xrange(2):
+            # if the curve is one-sided and the new length after cutting
+            # is more than 1, we can't compute the train track transition map
+            if arcs[i].length() > 0.5 and sep1.end_side == sep2.end_side:
+                good_indices.remove(i)
+
         import itertools
-        for x in itertools.chain(sep1.intersections, sep2.intersections):
+        for x in itertools.chain(sep1.intersections()[:-1], sep2.intersections()[:-1]):
             for i in good_indices:
                 if arcs[i].contains(x):
                     good_indices.remove(i)
@@ -294,22 +309,85 @@ class TransverseCurve(SageObject):
                         return []
                     break
                         
-        return [TransverseCurve(sep[i],sep[(i+1)%2]) for
+        return [TransverseCurve(sep[i], openness[0], sep[(i+1)%2],
+                                openness[1]) for
                 i in good_indices]
                            
     def is_one_sided(self):
-        return sep1.end_side() == sep2.end_side()
+        return self._sep[0].end_side == self._sep[1].end_side
 
-    def cut(self):
+    def new_foliation(self):
         foliation = self._sep[0].foliation
         separatrices = Separatrix.get_all(foliation, self._arc)
                
-        from Foliation import from_separatrix
-        return from_separatrix(separatrices, self._arc.length())
+        from transition_map import new_foliation
+        return new_foliation(separatrices, self._sep[0].endpoint,
+                             self._sep[0].start_side,
+                             is_one_sided = self.is_one_sided(),
+                             direction = self._direction,
+                             ending_point = self._sep[1].endpoint)
 
-    @classmethod
-    def find_transverse_curves(cls, interval, end,
-            num_flipped_ints1, num_flipped_ints2, max_lengthening):
+Coding = namedtuple("Coding", "side, index, end")
 
+def get_transverse_curve(foliation, coding):
+    interval = foliation.interval(coding.side, coding.index)
+    if not interval.is_flipped():
+        sep1 = Separatrix(foliation, interval,
+                          number_of_flips_to_stop = 0)
+        sep2 = Separatrix(foliation, interval.pair(),
+                          number_of_flips_to_stop = 0)
+        return TransverseCurve.get_transverse_curves(\
+                                            sep1, 0, sep2, 0))
+    other_int = interval.pair()
+    sep1 = Separatrix(foliation, interval,
+                      number_of_flips_to_stop = 0)
+    sep2 = Separatrix(foliation, other_int.next(),
+                      number_of_flips_to_stop = 1)
+    curves.extend(TransverseCurve.get_transverse_curves(\
+                                        sep1, 0, sep2, 1))
 
-                                     
+    sep1 = Separatrix(foliation, interval.next(),
+                      number_of_flips_to_stop = 0)
+    sep2 = Separatrix(foliation, other_int,
+                      number_of_flips_to_stop = 1)
+    curves.extend(TransverseCurve.get_transverse_curves(\
+                                    sep1, 1, sep2, 0))
+
+def get_transverse_curves(foliation):
+    curves = []
+    done = set()
+    for interval in foliation.intervals():
+        if not interval.is_flipped():
+            if interval in done:
+                continue
+            done.add(interval.pair())
+            sep1 = Separatrix(foliation, interval,
+                              number_of_flips_to_stop = 0)
+            sep2 = Separatrix(foliation, interval.pair(),
+                              number_of_flips_to_stop = 0)
+            curves.extend(TransverseCurve.get_transverse_curves(\
+                                                sep1, 0, sep2, 0))
+        else:
+            other_int = interval.pair()
+            sep1 = Separatrix(foliation, interval,
+                              number_of_flips_to_stop = 0)
+            sep2 = Separatrix(foliation, other_int.next(),
+                              number_of_flips_to_stop = 1)
+            curves.extend(TransverseCurve.get_transverse_curves(\
+                                                sep1, 0, sep2, 1))
+
+            sep1 = Separatrix(foliation, interval.next(),
+                              number_of_flips_to_stop = 0)
+            sep2 = Separatrix(foliation, other_int,
+                              number_of_flips_to_stop = 1)
+            curves.extend(TransverseCurve.get_transverse_curves(\
+                                            sep1, 1, sep2, 0))
+            
+
+    return curves
+
+# PseudoAnosov = namedtuple("PseudoAnosov", "start_fol, 
+
+def find_pseudo_anosovs(foliation, depth, tt_map_so_far, coding_so_far):
+    curves = get_transverse_curves(foliation)
+    

@@ -66,7 +66,12 @@ def new_foliation(separatrices, starting_point, starting_side,
 
     new_fol = Foliation(*gen_perm, lengths = lengths,
                      flips = flips, twist = twist)
-    return (new_fol, path_entries)
+    old_fol = separatrices[0][0].foliation
+    tt_map = None if lift_type != None else get_tt_map(old_fol,
+                                                       new_fol,
+                                                       path_entries)
+                                                       
+    return (new_fol, tt_map)
 
 
 

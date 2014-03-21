@@ -587,6 +587,9 @@ class Foliation(SageObject):
             return self._all_intervals[0]
         return self._all_intervals[0] + self._all_intervals[1]
 
+    def interval(self, side, index):
+        return self._all_intervals[side][index]
+
     def num_intervals(self, side):
         return len(self._gen_perm[side])
 
@@ -1307,15 +1310,13 @@ v            OUTPUT:
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
         i = self._all_intervals[0][0]
         i = i.add_to_position(-n)
-        new_fol, paths = new_foliation(separatrices, i.endpoint(0), 0)
-        return (new_fol, get_tt_map(self, new_fol, paths))
+        return new_foliation(separatrices, i.endpoint(0), 0)
 
     def reversed(self):
         from separatrix import Separatrix
         from transition_map import new_foliation, get_tt_map
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
-        new_fol, paths = new_foliation(separatrices, 0, 0, direction = 'left')
-        return (new_fol, get_tt_map(self, new_fol, paths))
+        return new_foliation(separatrices, 0, 0, direction = 'left')
                                  
     
 

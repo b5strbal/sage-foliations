@@ -49,7 +49,7 @@ def is_perron_frobenius(square_matrix):
     return g.is_primitive()
 
 
-def pf_eigen_data(square_matrix, field = RDF):
+def pf_eigen_data(square_matrix, field):
     m = matrix(square_matrix, field)
     evr = m.eigenvectors_right()
     largest = max(evr, key = lambda x: abs(x[0]))
