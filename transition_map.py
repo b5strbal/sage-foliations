@@ -1,6 +1,8 @@
 from train_track import TrainTrack
 from collections import namedtuple
-from foliation import mod_one, Foliation
+from foliation import Foliation
+from mymath import mod_one
+from constants import *
 
 def new_foliation(separatrices, starting_point, starting_side,
                       is_one_sided = False, direction = 'right',
@@ -8,13 +10,14 @@ def new_foliation(separatrices, starting_point, starting_side,
     separatrices = sorted_separatrices(separatrices, starting_point,
                                        starting_side, is_one_sided,
                                        direction)
+
+    # print separatrices
+    # print direction, starting_point, ending_point, starting_side
     if ending_point == None:
         arc_length = 1
         ending_point = starting_point
-    elif direction == 'right':
-        arc_length = mod_one(ending_point - starting_point)
     else:
-        arc_length = mod_one(starting_point - ending_point)
+        arc_length = mod_one(ending_point - starting_point)
 
     flips = set()
     remaining_labels = range((len(separatrices[0]) +
@@ -48,7 +51,8 @@ def new_foliation(separatrices, starting_point, starting_side,
                                           side, i, end,
                                           lift_type,
                                           direction,
-                                          ending_point)
+                                          ending_point if direction == 'right' else
+                                          starting_point)
 
             p = path_entries[(side, i, 0)]
             label = remaining_labels.pop()
@@ -81,37 +85,76 @@ def get_tt_map(old_fol, new_fol, path_entries):
     vertex_map = {}
     edge_map = {}
 
-    # finding the strip which is not rectangular but L-shaped
-    # more specifically, the long vertical end of it
+    # Finding the strip which is not rectangular but L-shaped
+    # more specifically, the long vertical end of it.
+    to_be_corrected = []
     if not new_fol.is_bottom_side_moebius():
-        long_path = (1, new_fol.num_intervals(1) - 1, 0)
+        long_path_int = (1, new_fol.num_intervals(1) - 1)
+        
     else:
         side, pos = new_fol.in_which_interval(0.5, 0)
-        long_path = (0, pos, 0)
+        long_path_int = (0, pos)
         
+    # Also, finding the intervals on the opposite side of it that will need
+    # to be corrected.
+    start = new_fol.divvalues[long_path_int[0]][long_path_int[1]]
+    bound = start + 0.5 if new_fol.is_bottom_side_moebius() else start
+    n = new_fol.num_intervals(0) - 1
+    while new_fol.divvalues[0][n] > bound:
+        to_be_corrected.append((0,n))
+        n -= 1
+
 
     for interval in new_fol.intervals():
-        x1, x2 = interval.as_tuple()
-        if not (x1, x2, 0) in path_entries:
+        side, pos = interval.as_tuple()
+        # print x1, x2
+        if not (side, pos, 0) in path_entries:
             continue
-        pe = [path_entries[(x1, x2, i)] for i in range(2)]
+        pe = [path_entries[(side, pos, i)] for i in [LEFT, RIGHT]]
+        print pe[0]
+        print pe[1]
         long_end = None
-        for i in range(2):
-            if (x1, x2, i) == long_path:
-                long_end = (i, 0)
-                break
-            if (pe[i].new_side, pe[i].new_end, i) == long_path:
-                long_end = (i, 1)
-                break
+        # for i in [LEFT, RIGHT]:
+        if (side, pos) == long_path_int:
+            # the long end is at the beginning
+            long_end = (START, LEFT)
+            # print (pe[i].new_side, pe[i].new_end, i)
+            # print long_path
+        elif (pe[0].new_side, pe[0].new_i) == long_path_int:
+            # the long end is at the end
+            long_end = (END, pe[0].new_end)
+        tails, center = break_apart([pe[0].path,pe[1].path], long_end)
         
-        a0, a1, center, b0, b1 = break_apart([pe[0].path,pe[1].path], long_end)
-        v0 = vertex_map[interval] = a0[-1].end()
-        v1 = vertex_map[interval.pair()] = b0[0].start()
+        print side, pos
+        print tails
+
+        # computing the path in the long part of the L-shaped strip that has to
+        # be appended to some other paths on the other side
+        if long_end != None:
+            # finding the right tail 
+            long_path_to_append = tails[long_end[0]][long_end[1]]
+            
+            # reversing if necessary
+            if long_end[0] == END:
+                long_path_to_append = TrainTrack.Path(long_path_to_append).reversed()
+                
+            # cutting off the first edge
+            long_path_to_append = long_path_to_append[1:]
+
+        v0 = vertex_map[interval] = tails[START][LEFT][-1].end()
+        v1 = vertex_map[interval.pair()] = tails[END][LEFT][0].start()
         edge_map[tt_new.get_edge_from(interval, 'pair')] = TrainTrack.Path(center)
-        edge_map[tt_new.get_edge_from(v0, 'center')] = TrainTrack.Path(a0).reversed()
-        b = b1 if interval.is_flipped() else b0
-        edge_map[tt_new.get_edge_from(v1, 'center')] = TrainTrack.Path(b)
-        
+        edge_map[tt_new.get_edge_from(interval, 'center')] = TrainTrack.Path(tails[START][LEFT]).reversed()
+        b = tails[END][RIGHT if interval.is_flipped() else LEFT]
+        edge_map[tt_new.get_edge_from(interval.pair(), 'center')] = TrainTrack.Path(b)
+
+    print long_path_to_append
+    # print to_be_corrected
+    # print edge_map
+    for (side, pos) in to_be_corrected:
+        interval = new_fol.interval(side, pos)
+        edge_map[tt_new.get_edge_from(interval, 'center')].extend(long_path_to_append)
+
     return TrainTrack.Map(domain = tt_new,
                           codomain = tt_old,
                           vertex_map = vertex_map,
@@ -119,13 +162,14 @@ def get_tt_map(old_fol, new_fol, path_entries):
 
 
 def break_apart(paths, long_end = None):
-    diff = abs(len(paths[0]) - len(paths[1]))
+    diff = abs(len(paths[LEFT]) - len(paths[RIGHT]))
     cuts = [[1, -1], [1, -1]]
     if long_end != None:
         cuts[long_end[0]][long_end[1]] += diff * (-1)**long_end[1]
-    return (paths[0][:cuts[0][0]], paths[1][:cuts[1][0]],
-            paths[0][cuts[0][0]:cuts[0][1]],
-            paths[0][cuts[0][1]:], paths[1][cuts[1][1]:])
+    return ([[paths[0][:cuts[0][0]], paths[1][:cuts[1][0]]],
+            [paths[0][cuts[0][1]:], paths[1][cuts[1][1]:]]],
+            paths[0][cuts[0][0]:cuts[0][1]])
+
         
             
 
@@ -139,30 +183,28 @@ PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 def get_pair_and_path(separatrices, side, i, end, 
                        lift_type, direction, ending_point):
     tt = separatrices[0][0].foliation.train_track
-    s = separatrices[side][(i + end) % len(separatrices[side])]
+    s0 = separatrices[side][(i + end) % len(separatrices[side])]
 
-    
-    # on the last right end of the last interval on the top side,
-    # the traintrack path has to be cut off early
-    if (side, i, end) == (0, len(separatrices[0]) - 1, 1):
-        endpoint = ending_point
-    else:
-        endpoint = None
+            
+    # print separatrices
+    # print side, i, end
 
     if direction == 'left':
         end = (end + 1) % 2
     start_end = end
-    if s.is_flipped():
+    if s0.is_flipped():
         end = (end + 1) % 2
 
+    # print s
+    # print end, endpoint
     # converting first separatrix to train track path
-    path = s.tt_path(end, endpoint).reversed()
+    path = s0.tt_path(end).reversed()
+    
     interval = path[-1].end()
     # adding connecting interval to train track path
     interval2 = interval.pair()
-    path.append(tt.get_oriented_edge(interval,
-                                     interval2,
-                                     'pair'))
+    bridge = tt.get_oriented_edge(interval, interval2, 'pair')
+    path.append(bridge)
     interval = interval2
     if interval.is_flipped():
         end = (end + 1) % 2
@@ -173,25 +215,53 @@ def get_pair_and_path(separatrices, side, i, end,
                                               interval,
                                               lift_type,
                                               is_flipped_so_far, side)
-    s = separatrices[new_side][new_i]
-
-
-    if s.is_flipped():
+    s1 = separatrices[new_side][new_i]
+    
+    if s1.is_flipped():
         end = (end + 1) % 2
     if direction == 'left':
         end = (end + 1) % 2
     if end == 1:
         new_i = (new_i - 1) % len(separatrices[new_side])
 
-    # again, on the last right end of the last interval on the top side,
-    # the traintrack path has to be cut off early
-    if (new_side, new_i, end) == (0, len(separatrices[0]) - 1, 1):
-        endpoint = ending_point
-    else:
-        endpoint = None
+    # print new_side, new_i, end
+    # print ending_point
+
 
     # converting second separatrix to train track path
-    path.extend(s.tt_path(end if direction == 'right' else (end + 1)%2, endpoint))
+    path.extend(s1.tt_path(end if direction == 'right' else (end + 1)%2))
+
+
+    # we need to collect intersections for the special case when we need to
+    # cut something off from a path
+
+    # on the last right end of the last interval on the top side,
+    # the traintrack path has to be cut off early
+    begin_cut = (side, i, end) == (0, len(separatrices[0]) - 1, 1)
+    end_cut = (new_side, new_i, end) == (0, len(separatrices[0]) - 1, 1)
+
+
+    if not (begin_cut or end_cut):
+        return PathEntry(new_side,new_i,end,path)
+
+    p0 = p1 = None
+    if ending_point in s0.intersections():
+        if end_cut:
+            path = s0.tt_path(end, ending_point, 'after').reversed()
+            return PathEntry(new_side,new_i,end,path)
+        p0 = s0.tt_path(end, ending_point, 'before').reversed()
+    else:
+        if begin_cut:
+            path = s1.tt_path(end, ending_point, 'after')
+            return PathEntry(new_side,new_i,end,path)
+        p1 = s1.tt_path(end, ending_point, 'before')
+
+    if p0 == None:
+        p0 = s0.tt_path(end).reversed()
+    if p1 == None:
+        p1 = s1.tt_path(end)
+        
+    path = p0 + [bridge] + p1
 
     return PathEntry(new_side,new_i,end,path)
 
@@ -219,7 +289,7 @@ def sorted_separatrices(separatrices, starting_point, starting_side,
                         is_one_sided, direction = 'right'):
     def distance(sep):
         if direction == 'right':
-            return  mod_one(sep.endpoint - starting_point)
+            return mod_one(sep.endpoint - starting_point)
         else:
             return mod_one(starting_point - sep.endpoint)
         
@@ -230,7 +300,7 @@ def sorted_separatrices(separatrices, starting_point, starting_side,
             for side in {0, 1}]
 
     if starting_side == 1:
-        seps = reversed(seps)
+        seps = list(reversed(seps))
     
     if is_one_sided:
         seps[0].extend(seps[1])

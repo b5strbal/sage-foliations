@@ -2,43 +2,11 @@ from sage.dynamics.interval_exchanges.constructors import GeneralizedPermutation
 from sage.structure.sage_object import SageObject
 from collections import namedtuple
 from sage.matrix.constructor import vector
+from mymath import mod_one
 
-LEFT = -1
-RIGHT = 1
 epsilon = 1e-10
 
 
-def mod_one(x):
-    """
-    Returns a number modulo 1.
-
-    INPUT:
-
-    - ``x`` - a real number
-
-    OUTPUT:
-
-    - a real number of the same type as the input
-
-    TESTS::
-
-        sage: from sage.dynamics.foliations.foliation import mod_one
-        sage: mod_one(2.5)
-        0.500000000000000
-        sage: mod_one(-1.7)
-        0.300000000000000
-        sage: mod_one(7/6)
-        1/6
-        sage: mod_one(-1/6)
-        5/6
-        sage: a = QQbar(sqrt(2)); a
-        1.414213562373095?
-        sage: mod_one(a)
-        0.4142135623730951?
-
-    """
-    from sage.functions.other import floor 
-    return x - floor(x)
 
 def basis_vector(n, k):
     """
@@ -212,31 +180,6 @@ def arnoux_yoccoz_factor(genus, field = RDF):
 class SaddleConnectionError(Exception):
     pass
 
-class RestrictionError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return self.value
-
-
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
- 
 from sage.rings.rational import Rational
 class Foliation(SageObject):
     """
@@ -580,7 +523,8 @@ class Foliation(SageObject):
                     self._pair[interval] = label_to_interval[label]
 
 
-
+    def permutation(self):
+        return self._gen_perm
 
     def intervals(self):
         if self.is_bottom_side_moebius():

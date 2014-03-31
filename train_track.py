@@ -64,6 +64,13 @@ class TrainTrack(SageObject):
             self._index_to_edge.append(edge)
             edge_count += 1
 
+    def __eq__(self, other):
+        # print self._index_to_edge
+        # print other._index_to_edge
+        # print self._index_to_edge == other._index_to_edge
+        # print '\n'
+        return self._index_to_edge == other._index_to_edge
+
     @property
     def foliation(self):
         return self._foliation
@@ -120,6 +127,8 @@ class TrainTrack(SageObject):
 
     def path_to_vector(self, path, signed):
         result = [0] * len(self._index_to_edge)
+        # print self._edge_to_index
+        # print path
         for oe in path:
             result[self._edge_to_index[oe.edge]] += oe.direction \
                                     if signed else 1
@@ -140,6 +149,10 @@ class TrainTrack(SageObject):
             return TrainTrack.Path([oe.reversed() for 
                             oe in reversed(self)])
 
+        @classmethod
+        def from_edge(self, edge):
+            return TrainTrack.Path([OrientedEdge(edge, 1)])
+
         # def __getitem__(self, index):
         #     result = list.__getitem__(self, index)
         #     try:
@@ -155,9 +168,16 @@ class TrainTrack(SageObject):
     class Map(namedtuple("TrainTrackMap", "domain, codomain,"
                          "vertex_map, edge_map")):
         def __mul__(self, other):
+            # f*g means g comes first, then f
+            # print self.domain.foliation
+            # print self.codomain.foliation
+            # print other.domain.foliation
+            # print other.codomain.foliation
+            # print self.edge_map
+            # print other.edge_map
             new_vertex_map = {v:self.vertex_map[other.vertex_map[v]]
                               for v in other.vertex_map}
-            new_edge_map = {e:self._map_path[other.edge_map[e]]
+            new_edge_map = {e:self._map_path(other.edge_map[e])
                             for e in other.edge_map}
                
             return TrainTrack.Map(domain = other.domain,
@@ -186,7 +206,17 @@ class TrainTrack(SageObject):
             mlist = m.rows()
             mlist.extend(tt.kernel_from_singularities())
             return matrix(mlist).right_kernel_matrix()
+
+        @classmethod
+        def identity(cls, foliation):
+            tt = foliation.train_track
+            return TrainTrack.Map(tt, tt,
+                                  {v:v for v in tt.vertices()},
+                {e:TrainTrack.Path.from_edge(e) for e in tt.edges()})
                 
+        def is_self_map(self):
+            return self.domain == self.codomain
+
         def invariant_cohomology(self):
             # rows generate the kernel
             M = self._cohomology_kernel()

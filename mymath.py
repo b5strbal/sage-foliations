@@ -1,6 +1,39 @@
 from sage.structure.sage_object import SageObject
 from collections import deque
 
+def mod_one(x):
+    """
+    Returns a number modulo 1.
+
+    INPUT:
+
+    - ``x`` - a real number
+
+    OUTPUT:
+
+    - a real number of the same type as the input
+
+    TESTS::
+
+        sage: from sage.dynamics.foliations.foliation import mod_one
+        sage: mod_one(2.5)
+        0.500000000000000
+        sage: mod_one(-1.7)
+        0.300000000000000
+        sage: mod_one(7/6)
+        1/6
+        sage: mod_one(-1/6)
+        5/6
+        sage: a = QQbar(sqrt(2)); a
+        1.414213562373095?
+        sage: mod_one(a)
+        0.4142135623730951?
+
+    """
+    from sage.functions.other import floor 
+    return x - floor(x)
+
+
 class OrientedGraph(SageObject):
     def __init__(self, square_matrix):
         self._n = square_matrix.nrows()
@@ -45,7 +78,10 @@ def matrix_to_adj_list(square_matrix):
 
 
 def is_perron_frobenius(square_matrix):
+    # print square_matrix
+    # print square_matrix**50
     g = OrientedGraph(square_matrix)
+    # print g.is_primitive()
     return g.is_primitive()
 
 

@@ -1,9 +1,9 @@
 from sage.structure.sage_object import SageObject
-from foliation import mod_one
+from mymath import mod_one
 from train_track import TrainTrack
 
 class Separatrix(SageObject):
-    def __init__(self, foliation, interval, bounding_arc = None,
+    def __init__(self, foliation, interval, end = 0, bounding_arc = None,
                  number_of_flips_to_stop = None,
                  stop_at_first_orientation_reverse = False):
         r"""
@@ -34,6 +34,7 @@ class Separatrix(SageObject):
         assert(not self._foliation.is_bottom_side_moebius() or 
                 interval.side == 0) # otherwise it is not a real separatrix
         self._flip_count = 0
+        interval = interval.add_to_position(end)
         p = interval.endpoint(0)
         self._intersections = [p]
         self._tt_path = TrainTrack.Path()
@@ -98,12 +99,13 @@ class Separatrix(SageObject):
         self._tt_path.append(self._tt.get_oriented_edge(last_int, new_int,
                                                     'center', p))
                 
-    def tt_path(self, end, endpoint = None):
+    def tt_path(self, end, endpoint = None, to_keep = 'before'):
         first_edge = self._tt_path[0] if end == 0 else \
                 self._other_first_edge
         path = TrainTrack.Path([first_edge] + self._tt_path[1:])
         if endpoint == None:
             return path
+        return path
 
         cutting_index = 0
         while self._intersections[cutting_index] != endpoint:
@@ -111,7 +113,10 @@ class Separatrix(SageObject):
 
         if cutting_index % 2 == 1:
             cutting_index -= 1
-        return TrainTrack.Path(path[:cutting_index+1])
+        if to_keep == 'before':
+            return TrainTrack.Path(path[:cutting_index+1])
+        if to_keep == 'after':
+            return TrainTrack.Path(path[cutting_index:])
 
     def _repr_(self):
         s = "Intersections: "
@@ -179,7 +184,7 @@ class Separatrix(SageObject):
     def get_all(cls, foliation, bounding_arc = None,
                 number_of_flips_to_stop = None,
                 stop_at_first_orientation_reverse = False):
-        return [Separatrix(foliation, interval, bounding_arc,
+        return [Separatrix(foliation, interval, 0, bounding_arc,
                            number_of_flips_to_stop,
                            stop_at_first_orientation_reverse) for
                 interval in foliation.intervals()]
