@@ -8,123 +8,32 @@ epsilon = 1e-10
 
 
 
-def basis_vector(n, k):
-    """
-    Returns a standard basis vector of a vector space.
+# def basis_vector(n, k):
+#     """
+#     Returns a standard basis vector of a vector space.
 
-    INPUT:
+#     INPUT:
 
-    - ``n`` - positive integer, the dimension of the vector space
+#     - ``n`` - positive integer, the dimension of the vector space
 
-    - ``k`` - 0 <= k < n, the index of the only coordinate which
-      is 1.
+#     - ``k`` - 0 <= k < n, the index of the only coordinate which
+#       is 1.
 
-    OUTPUT:
+#     OUTPUT:
 
-    - list - the basis vector in as a list
+#     - list - the basis vector in as a list
 
-    EXAMPLES::
+#     EXAMPLES::
 
-        sage: from sage.dynamics.foliations.foliation import basis_vector
-        sage: basis_vector(5, 1)
-        [0, 1, 0, 0, 0]
-        sage: basis_vector(7, 6)
-        [0, 0, 0, 0, 0, 0, 1]
-
-    """
-    l = [0] * n
-    l[k] = 1
-    return l
-
-def make_positive(vec):
-    """
-    Returns a parallel vector to a given vector with all positive
-    coordinates if possible.
-
-    INPUT:
-
-    - ``vec`` - a vector or list or tuple of numbers
-
-    OUTPUT:
-
-    - vector - a vector with positive coordinates if this is possible,
-      otherwise -1
-
-    EXAMPLES:
-
-    If all coordinates of the input vector are already positive, the
-    same vector is returned::
-
-        sage: from sage.dynamics.foliations.foliation import make_positive
-        sage: v = vector([1, 3, 5])
-        sage: make_positive(v) == v
-        True
-
-    If all are negative, its negative is returned::
-
-        sage: make_positive((-1, -5))
-        (1, 5)
-
-    Even if the coordinates are complex, but have very small imaginary
-    part as a result of an approximate eigenvector calculation for 
-    example, the coordinates are treated as real::
-
-        sage: make_positive((40.24 - 5.64e-16*I, 1.2 + 4.3e-14*I))
-        (40.2400000000000, 1.20000000000000)
-        sage: make_positive((-40.24 - 5.64e-16*I, -1.2 + 4.3e-14*I))
-        (40.2400000000000, 1.20000000000000)
-
-    If there is a complex coordinate which is not negligible, -1 is
-    returned::
-
-        sage: make_positive((-40.24 - 5.64e-6*I, -1.2 + 4.3e-14*I))
-        -1
-
-    If one coordinate is zero, or very close to zero, -1 is returned::
-
-        sage: make_positive((1, 0, 2))
-        -1
-        sage: make_positive((-40.24e-15*I - 5.64e-16*I, -1.2))
-        -1
-
-    If there are both negative and positive coordinates, -1 is 
-    returned::
-
-        sage: make_positive((-3, 4, 5))
-        -1
-        
-    """
-    if any(abs(x) < epsilon for x in vec) or \
-        any(abs(x.imag()) > epsilon for x in vec):
-            return -1
-    newvec = vector([x.real() for x in vec])
-    if vec[0].real() < 0:
-        newvec = -newvec
-    if any(x < 0 for x in newvec):
-        return -1
-    return newvec
-
-def get_good_eigendata(transition_matrix, is_twisted):
-    """
-    
-        sage: from sage.dynamics.foliations.foliation import get_good_eigendata
-
-
-    """
-    ev = transition_matrix.eigenvectors_right()
-    ret_list = []
-    for x in ev:
-        if abs(x[0].imag()) < epsilon and x[0].real() > 0 \
-                and abs(x[0].real() - 1) > epsilon:
-            for vec in x[1]:
-                newvec = make_positive(vec)
-                if newvec != -1:
-                    norm = sum([abs(y) for y in newvec])
-                    if is_twisted:
-                        norm -= abs(newvec[-1])
-                    normalized_vec = [abs(y / norm) for y in newvec]
-                    ret_list.append((x[0].real(), normalized_vec))
-    return ret_list
+#         sage: from sage.dynamics.foliations.foliation import basis_vector
+#         sage: basis_vector(5, 1)
+#         [0, 1, 0, 0, 0]
+#         sage: basis_vector(7, 6)
+#         [0, 0, 0, 0, 0, 0, 1]
+#     """
+#     l = [0] * n
+#     l[k] = 1
+#     return l
 
 
 

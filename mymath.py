@@ -84,52 +84,125 @@ def is_perron_frobenius(square_matrix):
     # print g.is_primitive()
     return g.is_primitive()
 
+class NoPFEigenvectorError(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return self.value
 
 def pf_eigen_data(square_matrix, field):
     m = matrix(square_matrix, field)
     evr = m.eigenvectors_right()
     largest = max(evr, key = lambda x: abs(x[0]))
-    v = largest[1][0]
+    eigenvalue = largest[0]
+    if abs(eigenvalue.imag()) > epsilon or eigenvalue.real() < 1 + epsilon:
+        raise NoPFEigenvectorError("Dominant eigenvalue is not a real number"
+                                   " greater than 1.")
+    if largest[2] > 1:
+        raise NoPFEigenvectorError("Dominant eigenvalue has multiplicity "
+                                   "larger than one.")
+    v = make_positive(largest[1][0])  # eigenvector
+    if v == -1: # cannot made positive
+        raise NoPFEigenvectorError("Dominant eigenvector doesn't lie in the "
+                                   "positive quadrant.")
     v /= sum(v)
-    return (largest[0], v)
+    return (eigenvalue, v)
     
 
 
 
+def make_positive(vec):
+    """
+    Returns a parallel vector to a given vector with all positive
+    coordinates if possible.
 
+    INPUT:
 
+    - ``vec`` - a vector or list or tuple of numbers
 
-# EPS = 1e-15
-# def pf_eigen_data(square_matrix):
-#     m = square_matrix
-#     # this n^2 - 2n + 2 is large enough power to make all entries positive,
-#     # although it is not important here
-#     M = power_up(m)
+    OUTPUT:
+
+    - vector - a vector with positive coordinates if this is possible,
+      otherwise -1
+
+    EXAMPLES:
+
+    If all coordinates of the input vector are already positive, the
+    same vector is returned::
+
+        sage: from sage.dynamics.foliations.foliation import make_positive
+        sage: v = vector([1, 3, 5])
+        sage: make_positive(v) == v
+        True
+
+    If all are negative, its negative is returned::
+
+        sage: make_positive((-1, -5))
+        (1, 5)
+
+    Even if the coordinates are complex, but have very small imaginary
+    part as a result of an approximate eigenvector calculation for 
+    example, the coordinates are treated as real::
+
+        sage: make_positive((40.24 - 5.64e-16*I, 1.2 + 4.3e-14*I))
+        (40.2400000000000, 1.20000000000000)
+        sage: make_positive((-40.24 - 5.64e-16*I, -1.2 + 4.3e-14*I))
+        (40.2400000000000, 1.20000000000000)
+
+    If there is a complex coordinate which is not negligible, -1 is
+    returned::
+
+        sage: make_positive((-40.24 - 5.64e-6*I, -1.2 + 4.3e-14*I))
+        -1
+
+    If one coordinate is zero, or very close to zero, -1 is returned::
+
+        sage: make_positive((1, 0, 2))
+        -1
+        sage: make_positive((-40.24e-15*I - 5.64e-16*I, -1.2))
+        -1
+
+    If there are both negative and positive coordinates, -1 is 
+    returned::
+
+        sage: make_positive((-3, 4, 5))
+        -1
+        
+    """
+    if any(abs(x) < epsilon for x in vec) or \
+        any(abs(x.imag()) > epsilon for x in vec):
+            return -1
+    newvec = vector([x.real() for x in vec])
+    if vec[0].real() < 0:
+        newvec = -newvec
+    if any(x < 0 for x in newvec):
+        return -1
+    return newvec
+
+# def get_good_eigendata(transition_matrix, is_twisted):
+#     """
     
-#     # get estimate for pf_eigenvalue and normalize the matrix
-#     # ev = sum(M*M.column(0)) / float(sum(M.column(0)))
-#     # print ev
-#     # print M/ev
-#     # print (M/ev).eigenvalues()
+#         sage: from sage.dynamics.foliations.foliation import get_good_eigendata
 
-#     v = M.column(0)
-#     v /= float(sum(v))
-#     count = 0
-#     while True:
-#         count += 1
-#         old_v = v
-#         # print v
-#         v = M*v
-#         v /= sum(v)
-#         if abs(old_v - v) < EPS:
-#             break
-#         if count > 100:
-#             raise RuntimeError("Eigenvector doesn't seem to converge")
-#     return (sum(m*v)/sum(v), v)
-            
 
-# LIMIT = 10**30
-# def power_up(m):
-#     while sum(m.list()) < LIMIT:
-#         m = m*m
-#     return m
+#     """
+#     ev = transition_matrix.eigenvectors_right()
+#     ret_list = []
+#     for x in ev:
+#         if abs(x[0].imag()) < epsilon and x[0].real() > 0 \
+#                 and abs(x[0].real() - 1) > epsilon:
+#             for vec in x[1]:
+#                 newvec = make_positive(vec)
+#                 if newvec != -1:
+#                     norm = sum([abs(y) for y in newvec])
+#                     if is_twisted:
+#                         norm -= abs(newvec[-1])
+#                     normalized_vec = [abs(y / norm) for y in newvec]
+#                     ret_list.append((x[0].real(), normalized_vec))
+#     return ret_list
+
+
+
+
+

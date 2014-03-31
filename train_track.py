@@ -134,6 +134,7 @@ class TrainTrack(SageObject):
                                     if signed else 1
         return result
 
+
     def _latex_(self):
         r"""
         Returns the LaTeX/TikZ representaion of the train track.
@@ -259,3 +260,10 @@ class TrainTrack(SageObject):
             
         def is_pseudo_anosov(self):
             return is_perron_frobenius(self.edge_matrix())
+
+
+
+def reduce(tt):
+    """Create a projection to a traintrack without 2-prong vertices."""
+    
+    pass
