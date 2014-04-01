@@ -126,7 +126,10 @@ def get_tt_map(old_fol, new_fol, path_entries):
         tails, center = break_apart([pe[0].path,pe[1].path], long_end)
         
         # print side, pos
-        # print tails
+        # print "tails: ", tails
+        # print "center:", center
+        # print "long_path_int:", long_path_int
+        # print "Long end:",long_end
 
         # computing the path in the long part of the L-shaped strip that has to
         # be appended to some other paths on the other side
@@ -162,10 +165,13 @@ def get_tt_map(old_fol, new_fol, path_entries):
 
 
 def break_apart(paths, long_end = None):
+    # print paths[0]
+    # print paths[1]
+    # print long_end
     diff = abs(len(paths[LEFT]) - len(paths[RIGHT]))
     cuts = [[1, -1], [1, -1]]
     if long_end != None:
-        cuts[long_end[0]][long_end[1]] += diff * (-1)**long_end[1]
+        cuts[long_end[1]][long_end[0]] += diff * (-1)**long_end[0]
     return ([[paths[0][:cuts[0][0]], paths[1][:cuts[1][0]]],
             [paths[0][cuts[0][1]:], paths[1][cuts[1][1]:]]],
             paths[0][cuts[0][0]:cuts[0][1]])

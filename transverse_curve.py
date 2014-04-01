@@ -1,6 +1,7 @@
 from separatrix import Separatrix
 from arc import Arc
-
+from collections import namedtuple
+from sage.structure.sage_object import SageObject
 
 class RestrictionError(Exception):
     def __init__(self, value):
@@ -160,6 +161,8 @@ def find_pseudo_anosov_candidates(foliation, depth,
                 new_fol = f.with_changed_lengths(list(eigenvector))
                 ps = PseudoAnosov((m.charpoly(), eigenvalue, new_fol), final_coding)
                 result.append(ps)
+                # result.extend([m, final_tt_map.edge_matrix().transpose()])
+
 
     if depth == 0:
         return result
@@ -169,10 +172,13 @@ def find_pseudo_anosov_candidates(foliation, depth,
         try:
             tc = TransverseCurve(foliation, c)
             new_fol, tt_map = tc.new_foliation()
+            # m1 = tt_map.edge_matrix()
+            # m2 = (tt_map_so_far * tt_map).edge_matrix()
             result.extend(find_pseudo_anosov_candidates(\
                         new_fol, depth - 1,
                         tt_map_so_far * tt_map,
                         coding_so_far + [c]))
+                        # coding_so_far + [c, foliation, m1, m2]))
         except RestrictionError: # also SaddleConnectionError?
             pass
     
