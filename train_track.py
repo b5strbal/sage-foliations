@@ -85,16 +85,49 @@ class TrainTrack(SageObject):
         circles = self.foliation.paths_around_singularities
         return [self.path_to_vector(circle, signed = True) for circle in circles]
 
-    def coboundary_map_from_vertices(self):
+    def coboundary_map_from_vertices(self, cochain_type):
         m = matrix(ZZ, len(self._index_to_edge), len(self._index_to_vertex))
-        for i in range(len(self._index_to_edge)):
-            e = self._index_to_edge[i]
-            m[i, self._vertex_to_index[e[0]]] -= 1
-            m[i, self._vertex_to_index[e[1]]] += 1
+        if cochain_type == 'cohomology':
+            for i in range(len(self._index_to_edge)):
+                e = self._index_to_edge[i]
+                m[i, self._vertex_to_index[e[0]]] -= 1
+                m[i, self._vertex_to_index[e[1]]] += 1
+        elif cochain_type == 'train track module':
+            for i in range(len(self._index_to_edge)):
+                e = self._index_to_edge[i]
+                if e[2] == 'center':
+                    x = 1
+                else:
+                    x = -1
+                m[i, self._vertex_to_index[e[0]]] += x
+                m[i, self._vertex_to_index[e[1]]] += x
+            
         return m
             
-            
+                    
+    def matrix_to_recude_dimension(self):
+        from copy import copy
+        from sage.rings.rational import Rational
+        X = self.coboundary_map_from_vertices('train track module')
+        # flipping the matrix over vertically (so the echelonizing works
+        # in the way we want) and transpose
+        X = matrix(list(reversed(X.rows()))).transpose()
+        X = X.echelon_form(include_zero_rows = False)
+        print X
         
+        # if the train track is non-orientable, the last row will be a
+        # multiple of two, so we have to normalize it and re-echelonize.
+        n = X.nrows()
+        X = copy(X).with_row_set_to_multiple_of_row(n-1, n-1, Rational('1/2'))
+        X = X.echelon_form()
+        print X
+
+        # now we need to cut off the identity part of the matrix and
+        # append a small block of identity in the different direction
+        X = matrix(list(reversed(X.rows())))
+        X = -matrix(list(reversed(X.columns()[X.nrows():]))).transpose()
+        X = matrix(matrix.identity(X.ncols()).rows() + X.rows())
+        return X
 
     def get_edge_from(self, from_vertex, edge_type):
         return (from_vertex, self._from[edge_type][from_vertex], edge_type)
@@ -221,7 +254,7 @@ class TrainTrack(SageObject):
         def invariant_cohomology(self):
             # rows generate the kernel
             M = self._cohomology_kernel()
-            C = self.domain.coboundary_map_from_vertices()
+            C = self.domain.coboundary_map_from_vertices('cohomology')
             D, U, V = C.smith_form() # D = U * C * V
 
             # Modifying U in the smith form such that D is a diagonal matrix
