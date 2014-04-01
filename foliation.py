@@ -4,7 +4,7 @@ from collections import namedtuple
 from sage.matrix.constructor import vector
 from mymath import mod_one
 
-epsilon = 1e-10
+from constants import epsilon
 
 
 
@@ -967,6 +967,14 @@ v            OUTPUT:
         return Foliation('a a b b c c', 'moebius',
                 [1/sf + 1/sf**2, 1/sf**2 + 1/sf**3, 1/sf + 1/sf**3],
                 flips = 'abc')
+
+    def with_changed_lengths(self, length_vector):
+        if self.is_bottom_side_moebius():
+            return Foliation(self._gen_perm[0], 'moebius', length_vector,
+                             flips = self.flips())
+        return Foliation(self._gen_perm[0], self._gen_perm[1],
+                         length_vector[:-1], flips = self.flips(),
+                         twist = length_vector[-1])
 
     def __eq__(self, other):
         r"""

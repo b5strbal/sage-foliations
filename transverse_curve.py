@@ -117,6 +117,7 @@ def find_pseudo_anosov_candidates(foliation, depth,
                                   tt_map_so_far = None,
                                   coding_so_far = None):
     from train_track import TrainTrack
+    from mymath import NoPFEigenvectorError, pf_eigen_data
     if tt_map_so_far == None:
         tt_map_so_far = TrainTrack.Map.identity(foliation)
         coding_so_far = []
@@ -139,12 +140,25 @@ def find_pseudo_anosov_candidates(foliation, depth,
             # print final_coding
             # print final_tt_map.domain.foliation
             # print final_tt_map.codomain.foliation
-            if final_tt_map.is_self_map():
+            if final_tt_map.domain.foliation.permutation() ==\
+               final_tt_map.codomain.foliation.permutation():
                 # print final_tt_map.domain.foliation
                 # print final_tt_map.codomain.foliation
                 # print final_coding
+                m = final_tt_map.small_matrix().transpose()
+                try:
+                    eigenvalue, eigenvector = pf_eigen_data(m, RDF)
+                except NoPFEigenvectorError as ex:
+                    print "No PF Eigendata: ", ex
+                    continue
                 # if final_tt_map.is_pseudo_anosov():
-                ps = PseudoAnosov(final_tt_map, final_coding)
+                
+                # print "Charpoly:", m.charpoly()
+                # print "Stretch factor:", eigenvalue
+
+                f = final_tt_map.codomain.foliation
+                new_fol = f.with_changed_lengths(list(eigenvector))
+                ps = PseudoAnosov((m.charpoly(), eigenvalue, new_fol), final_coding)
                 result.append(ps)
 
     if depth == 0:

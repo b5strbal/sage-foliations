@@ -111,8 +111,8 @@ def get_tt_map(old_fol, new_fol, path_entries):
         if not (side, pos, 0) in path_entries:
             continue
         pe = [path_entries[(side, pos, i)] for i in [LEFT, RIGHT]]
-        print pe[0]
-        print pe[1]
+        # print pe[0]
+        # print pe[1]
         long_end = None
         # for i in [LEFT, RIGHT]:
         if (side, pos) == long_path_int:
@@ -125,8 +125,8 @@ def get_tt_map(old_fol, new_fol, path_entries):
             long_end = (END, pe[0].new_end)
         tails, center = break_apart([pe[0].path,pe[1].path], long_end)
         
-        print side, pos
-        print tails
+        # print side, pos
+        # print tails
 
         # computing the path in the long part of the L-shaped strip that has to
         # be appended to some other paths on the other side
@@ -148,7 +148,7 @@ def get_tt_map(old_fol, new_fol, path_entries):
         b = tails[END][RIGHT if interval.is_flipped() else LEFT]
         edge_map[tt_new.get_edge_from(interval.pair(), 'center')] = TrainTrack.Path(b)
 
-    print long_path_to_append
+    # print long_path_to_append
     # print to_be_corrected
     # print edge_map
     for (side, pos) in to_be_corrected:

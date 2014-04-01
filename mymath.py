@@ -1,5 +1,7 @@
 from sage.structure.sage_object import SageObject
 from collections import deque
+from sage.matrix.constructor import matrix, vector
+from constants import epsilon
 
 def mod_one(x):
     """

@@ -1,5 +1,5 @@
 from sage.structure.sage_object import SageObject
-from foliation import mod_one
+from mymath import mod_one
 from collections import namedtuple
 from sage.matrix.constructor import matrix
 from sage.rings.integer_ring import ZZ
