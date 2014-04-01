@@ -970,9 +970,9 @@ v            OUTPUT:
 
     def with_changed_lengths(self, length_vector):
         if self.is_bottom_side_moebius():
-            return Foliation(self._gen_perm[0], 'moebius', length_vector,
+            return Foliation(self._gen_perm_list[0], 'moebius', length_vector,
                              flips = self.flips())
-        return Foliation(self._gen_perm[0], self._gen_perm[1],
+        return Foliation(self._gen_perm_list[0], self._gen_perm_list[1],
                          length_vector[:-1], flips = self.flips(),
                          twist = length_vector[-1])
 
@@ -1101,6 +1101,10 @@ v            OUTPUT:
                         for k in {interval - 1, interval}}
 
             if any(abs(value - x) < epsilon for x in to_check):
+                # print self
+                # print self._divvalues
+                # print value
+                # print to_check
                 raise SaddleConnectionError()
         return self._all_intervals[side][(interval - 1) % 
                 self.num_intervals(side)]

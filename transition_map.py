@@ -1,6 +1,6 @@
 from train_track import TrainTrack
 from collections import namedtuple
-from foliation import Foliation
+from foliation import Foliation, SaddleConnectionError
 from mymath import mod_one
 from constants import *
 
@@ -65,12 +65,23 @@ def new_foliation(separatrices, starting_point, starting_side,
             if direction == 'left':
                 s1, s2 = s2, s1
             lengths[label] = mod_one(s2.endpoint - s1.endpoint)
-            if s1.end_side != s2.end_side:
+            if i == len(separatrices[side]) - 1:
+            # if s1.end_side != s2.end_side:
                 lengths[label] -= 1 - arc_length
 
-    new_fol = Foliation(*gen_perm, lengths = lengths,
-                     flips = flips, twist = twist)
+    
     old_fol = separatrices[0][0].foliation
+    try:
+        new_fol = Foliation(*gen_perm, lengths = lengths,
+                            flips = flips, twist = twist)
+    except SaddleConnectionError:
+        pass
+        # print gen_perm, lengths, twist
+        # print separatrices
+        # print twist
+        # # print old_fol._latex_()
+        # print starting_point, ending_point
+        # exit
     tt_map = None if lift_type != None else get_tt_map(old_fol,
                                                        new_fol,
                                                        path_entries)

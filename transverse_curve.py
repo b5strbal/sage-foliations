@@ -108,7 +108,7 @@ def get_codings(foliation):
                                 
     return codings
 
-PseudoAnosov = namedtuple("PseudoAnosov", "tt_map, coding") 
+PseudoAnosov = namedtuple("PseudoAnosov", "foliation, coding") 
 
 def find_pseudo_anosovs(foliation, depth):
     candidates = find_pseudo_anosov_candidates(foliation, depth)
@@ -154,11 +154,18 @@ def find_pseudo_anosov_candidates(foliation, depth,
                     continue
                 # if final_tt_map.is_pseudo_anosov():
                 
-                # print "Charpoly:", m.charpoly()
+                # print "Charpoly:", m.charpoly().factor()
+                # print matrix(m, RDF).eigenvectors_right()
                 # print "Stretch factor:", eigenvalue
+                # print "Eigenvector:", eigenvector
 
                 f = final_tt_map.codomain.foliation
-                new_fol = f.with_changed_lengths(list(eigenvector))
+                try:
+                    new_fol = f.with_changed_lengths(list(eigenvector))
+                except SaddleConnectionError:
+                    # sometimes the generated new lengths lead to a foliation
+                    # with a saddle connection
+                    continue
                 ps = PseudoAnosov((m.charpoly(), eigenvalue, new_fol), final_coding)
                 result.append(ps)
                 # result.extend([m, final_tt_map.edge_matrix().transpose()])
