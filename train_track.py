@@ -103,9 +103,15 @@ class TrainTrack(SageObject):
                 m[i, self._vertex_to_index[e[1]]] += x
             
         return m
-            
+         
+    def small_vector_size(self):
+        numints = len(self._index_to_vertex) / 2
+        return numints if self.foliation.is_bottom_side_moebius() \
+            else numints + 1
                     
-    def matrix_to_recude_dimension(self):
+    def matrix_to_reduce_dimension(self):
+        if hasattr(self, '_reducing_matrix'):
+            return self._reducing_matrix
         from copy import copy
         from sage.rings.rational import Rational
         X = self.coboundary_map_from_vertices('train track module')
@@ -113,20 +119,19 @@ class TrainTrack(SageObject):
         # in the way we want) and transpose
         X = matrix(list(reversed(X.rows()))).transpose()
         X = X.echelon_form(include_zero_rows = False)
-        print X
         
         # if the train track is non-orientable, the last row will be a
         # multiple of two, so we have to normalize it and re-echelonize.
         n = X.nrows()
         X = copy(X).with_row_set_to_multiple_of_row(n-1, n-1, Rational('1/2'))
         X = X.echelon_form()
-        print X
 
         # now we need to cut off the identity part of the matrix and
         # append a small block of identity in the different direction
         X = matrix(list(reversed(X.rows())))
         X = -matrix(list(reversed(X.columns()[X.nrows():]))).transpose()
         X = matrix(matrix.identity(X.ncols()).rows() + X.rows())
+        self._reducing_matrix = X
         return X
 
     def get_edge_from(self, from_vertex, edge_type):
@@ -281,13 +286,26 @@ class TrainTrack(SageObject):
                 return F
             M = F * U.transpose().inverse()
             return M
+
+        def small_matrix(self):
+            # The domain and the codomain should be both one-sided or both
+            # two-sided, otherwise the matrix won't be a square matrix
+            # Usually this is not a problem, since we only call this method
+            # is the underlying permutations are the same which is a much stronger
+            # condition.
+            m = self.domain.matrix_to_reduce_dimension()
+            result = m.transpose() * self.edge_matrix()
+            result = result.matrix_from_columns(range(
+                self.codomain.small_vector_size()))
+            return result
                                   
         def edge_matrix(self):
             if not hasattr(self, '_edge_matrix'):
                 tt = self.domain
-                self._edge_matrix = matrix([tt.path_to_vector(self.edge_map[edge],
-                                                              signed = False)
-                                            for edge in tt.edges()])
+                self._edge_matrix = matrix([self.codomain.path_to_vector(
+                    self.edge_map[edge],
+                    signed = False)
+                                            for edge in self.domain.edges()])
             return self._edge_matrix
 
             
