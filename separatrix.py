@@ -105,7 +105,7 @@ class Separatrix(SageObject):
         path = TrainTrack.Path([first_edge] + self._tt_path[1:])
         if endpoint == None:
             return path
-        return path
+        # return path
 
         cutting_index = 0
         while self._intersections[cutting_index] != endpoint:

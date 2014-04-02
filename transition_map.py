@@ -275,6 +275,10 @@ def get_pair_and_path(separatrices, side, i, end,
     if not (begin_cut or end_cut) or not do_we_cut:
         return PathEntry(new_side,new_i,end,path)
 
+    # print '------------'
+    # print path
+    # print '------------'
+
     p0 = p1 = None
     if ending_point in s0.intersections():
         if end_cut:
