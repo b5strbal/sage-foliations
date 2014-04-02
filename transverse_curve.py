@@ -3,6 +3,7 @@ from arc import Arc
 from collections import namedtuple
 from sage.structure.sage_object import SageObject
 
+
 class RestrictionError(Exception):
     def __init__(self, value):
         self.value = value
@@ -68,6 +69,8 @@ class TransverseCurve(SageObject):
 
         self._direction = 'right' if openness[0] == 'closed' else 'left'
         self._coding = coding
+        # print coding, self._direction, self._arc
+        # print '\n'
 
     def _repr_(self):
         s = ''
@@ -119,6 +122,9 @@ def find_pseudo_anosov_candidates(foliation, depth,
                                   coding_so_far = None):
     from train_track import TrainTrack
     from mymath import NoPFEigenvectorError, pf_eigen_data
+    from sage.rings.real_double import RDF
+    # from foliation import SaddleConnectionError
+
     if tt_map_so_far == None:
         tt_map_so_far = TrainTrack.Map.identity(foliation)
         coding_so_far = []
@@ -166,6 +172,7 @@ def find_pseudo_anosov_candidates(foliation, depth,
                     # sometimes the generated new lengths lead to a foliation
                     # with a saddle connection
                     continue
+                # ps = PseudoAnosov((tt_map, almost_final_tt_map, final_tt_map, m.charpoly(), eigenvalue, new_fol), final_coding)
                 ps = PseudoAnosov((m.charpoly(), eigenvalue, new_fol), final_coding)
                 result.append(ps)
                 # result.extend([m, final_tt_map.edge_matrix().transpose()])
@@ -185,6 +192,7 @@ def find_pseudo_anosov_candidates(foliation, depth,
                         new_fol, depth - 1,
                         tt_map_so_far * tt_map,
                         coding_so_far + [c]))
+                        # coding_so_far + [c, tt_map]))
                         # coding_so_far + [c, foliation, m1, m2]))
         except RestrictionError: # also SaddleConnectionError?
             pass

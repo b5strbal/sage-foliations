@@ -52,7 +52,8 @@ def new_foliation(separatrices, starting_point, starting_side,
                                           lift_type,
                                           direction,
                                           ending_point if direction == 'right' else
-                                          starting_point)
+                                          starting_point,
+                                          do_we_cut = arc_length < 1)
 
             p = path_entries[(side, i, 0)]
             label = remaining_labels.pop()
@@ -65,12 +66,24 @@ def new_foliation(separatrices, starting_point, starting_side,
             if direction == 'left':
                 s1, s2 = s2, s1
             lengths[label] = mod_one(s2.endpoint - s1.endpoint)
-            if i == len(separatrices[side]) - 1:
-            # if s1.end_side != s2.end_side:
+            if i == len(separatrices[side]) - 1 or s1.end_side != s2.end_side:
+                # the first condition is for the case when the transverse curve
+                # is orientable, the secong is for non-orientable
                 lengths[label] -= 1 - arc_length
 
-    
+    # print lengths
     old_fol = separatrices[0][0].foliation
+
+    x = sum(list(lengths.values()))
+    y = arc_length
+    if y == 1 and old_fol.is_bottom_side_moebius():
+        y = 0.5
+    if abs(x - y) > epsilon:
+        print x, y
+        print old_fol
+        print lengths
+        exit()
+
     try:
         new_fol = Foliation(*gen_perm, lengths = lengths,
                             flips = flips, twist = twist)
@@ -198,7 +211,7 @@ def break_apart(paths, long_end = None):
 PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 
 def get_pair_and_path(separatrices, side, i, end, 
-                       lift_type, direction, ending_point):
+                       lift_type, direction, ending_point, do_we_cut):
     tt = separatrices[0][0].foliation.train_track
     s0 = separatrices[side][(i + end) % len(separatrices[side])]
 
@@ -257,8 +270,9 @@ def get_pair_and_path(separatrices, side, i, end,
     begin_cut = (side, i, end) == (0, len(separatrices[0]) - 1, 1)
     end_cut = (new_side, new_i, end) == (0, len(separatrices[0]) - 1, 1)
 
-
-    if not (begin_cut or end_cut):
+    # do_we_cut: when the transformation is a rotation or reversing, we
+    # should not cut
+    if not (begin_cut or end_cut) or not do_we_cut:
         return PathEntry(new_side,new_i,end,path)
 
     p0 = p1 = None

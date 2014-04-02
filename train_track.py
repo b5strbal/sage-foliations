@@ -294,6 +294,7 @@ class TrainTrack(SageObject):
             # is the underlying permutations are the same which is a much stronger
             # condition.
             m = self.domain.matrix_to_reduce_dimension()
+            # print m
             result = m.transpose() * self.edge_matrix()
             result = result.matrix_from_columns(range(
                 self.codomain.small_vector_size()))
