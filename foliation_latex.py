@@ -3,7 +3,7 @@ from sage.structure.sage_object import SageObject
 
 from matplotlib.colors import ColorConverter
 from foliation import mod_one
-from constants import TOP, BOTTOM, LEFT, RIGHT
+from constants import TOP, BOTTOM, LEFT, RIGHT, epsilon
 
 _tikzcolors = ["red", "green", "blue", "cyan", "magenta", "yellow", 
     "gray", "brown", "lime", "olive", "orange", "pink", "purple", 
@@ -40,7 +40,7 @@ class FoliationLatex(SageObject):
         'color_strength':50,
         'interval_labelling':True,
         'length_labelling':True,
-        'separatrix_color':'black',
+        'separatrix_color':'darkgreen',
         'separatrix_draw_options':'dashed,thick',
         'transverse_curve_color':'red',
         'transverse_curve_draw_options':'very thick'
@@ -75,31 +75,63 @@ class FoliationLatex(SageObject):
         else:
             return self.__default_options[option_name]
 
-    def _tikz_of_separatrix(self, separatrix, hshift = None):
+    def _draw_segment(self, u, v):
+        return '\\draw[color=curvecolor,curve opts] ({u},0) -- ({v},0);\n'.\
+            format(u = u, v = v)
 
-        if self._foliation.is_bottom_side_moebius() and \
-           separatrix.num_intersections() % 2 == 0:
-            end_index = -2
+    def _tikz_of_curve(self, transverse_curve):
+        arcshift = RIGHT if transverse_curve.direction() == 'left' else LEFT
+        ep = [transverse_curve.arc()[i] for i in [0,1]]
+        u, v = [self._shift_point(self._adjust_point(ep[i]),
+                                  arcshift) for i in [0,1]]
+        
+        if u < v:
+            s = self._draw_segment(u, v)
         else:
-            end_index = -1
-        end_x = self._adjust_point(separatrix.get_intersection(end_index))
-        end_y = self._get_y(separatrix.end_side, end_x)
+            s = self._draw_segment(u, 1)
+            if v >= 0:
+                # otherwise we don't want the little segment between 0 and v
+                s += self._draw_segment(0, v)
 
 
-        draw_options = self.get_option('separatrix_draw_options' if hshift == None
-                                       else 'transverse_curve_draw_options')
+        sep = [transverse_curve.separatrix(i) for i in [0,1]]
+        hshifts = [(arcshift + 1) % 2 if sep[i].is_flipped() else arcshift
+                   for i in [0,1]]
+        for i in range(2):
+            s += self._tikz_of_separatrix(transverse_curve.separatrix(i),
+                                          hshifts[i])
+        return s
+
+    def _tikz_of_separatrix(self, separatrix, hshift = None):
         color = 'separatrixcolor' if hshift == None else 'curvecolor'
+        opts = 'separatrix opts' if hshift == None else 'curve opts'
 
-        s = '\\draw[color={col}, {opt}] ({x},0) -- ({x},{y});\n'.format(x=end_x,
-                                                                         y=end_y,
-                                                                         opt = draw_options,
-                                                                         col = color) 
+        s = ''
         for i in range((separatrix.num_intersections() - 1) // 2):
             x = self._adjust_point(separatrix.get_intersection(2*i))
+            x = self._shift_point(x, hshift)
             s += '\\draw[color={col}, {opt}] ({x},-0.5) --'\
-                 ' ({x},0.5);\n'.format(x=x, opt =
-                                        draw_options,
+                 ' ({x},0.5);\n'.format(x=x, opt = opts,
                                         col = color)
+            if separatrix.get_tt_edge(2 * i + 1).start().is_flipped():
+                hshift = (hshift + 1) % 2 if hshift != None else None
+
+        # if self._foliation.is_bottom_side_moebius() and \
+        #    separatrix.num_intersections() % 2 == 0:
+        #     end_index = -2
+        # else:
+        #     end_index = -1
+        x = separatrix.get_intersection(-1)
+        end_x = self._adjust_point(x)
+        end_x = self._shift_point(end_x, hshift)
+        end_y = self._get_y(separatrix.end_side, x)
+
+
+        s += '\\draw[color={col}, {opt}] ({x},0) -- ({x},{y});\n'.format(x=end_x,
+                                                                         y=end_y,
+                                                                         opt = opts,
+                                                                         col = color)
+
         return s
 
 
@@ -181,7 +213,8 @@ class FoliationLatex(SageObject):
 
 
 
-    def tikz_picture(self, separatrices = [], train_tracks = []):
+    def tikz_picture(self, separatrices = [], train_tracks = [],
+                     transverse_curves = []):
         r"""
         Returns the Latex/Tikz representation of the foliation.
 
@@ -299,9 +332,19 @@ class FoliationLatex(SageObject):
         s += '\\definecolor{{curvecolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
 
 
+        opts = self.get_option('separatrix_draw_options')
+        s += '\\tikzstyle{{separatrix opts}}=[{opts}]\n'.format(opts = opts)
+
+        opts = self.get_option('transverse_curve_draw_options')
+        s += '\\tikzstyle{{curve opts}}=[{opts}]\n'.format(opts = opts)
+
+
         s += fillings + lines + singularities + labels
         for separatrix in separatrices:
             s += self._tikz_of_separatrix(separatrix)
+
+        for curve in transverse_curves:
+            s += self._tikz_of_curve(curve)
 
         for train_track in train_tracks:
             s += self._tikz_of_train_track(train_track)
@@ -312,9 +355,15 @@ class FoliationLatex(SageObject):
     def _adjust_point(self, x):
         if not self._foliation.is_bottom_side_moebius():
             return x
-        if x > 0.5:
+        if x > 0.5 - epsilon:
             return 2 * (x - 0.5)
         return 2 * x
+
+    def _shift_point(self, x, direction = None):
+        if direction == None:
+            return x
+        SHIFT_BY = 0.005
+        return x - SHIFT_BY * (-1) ** direction
 
     def _get_side(self, side, point):
         if not self._foliation.is_bottom_side_moebius():

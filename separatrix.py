@@ -140,8 +140,15 @@ class Separatrix(SageObject):
     def intersections(self):
         return self._intersections
 
+    def intersections_without_endpoint(self):
+        c = -1 if self._foliation.is_bottom_side_moebius() else -2
+        return self._intersections[:c]
+
     def get_intersection(self, n):
         return self._intersections[n]
+
+    def get_tt_edge(self, n):
+        return self._tt_path[n]
 
     def num_intersections(self):
         return len(self._intersections)

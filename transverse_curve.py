@@ -20,8 +20,8 @@ class TransverseCurve(SageObject):
         interval = foliation.interval(coding.side, coding.index)
 
         # Checking if the curve is transverse
-        if (coding.num_flips1 % 2 == 1) != \
-           (coding.num_flips2 % 2 == 1) != \
+        if ((coding.num_flips1 % 2 == 1) != \
+           (coding.num_flips2 % 2 == 1)) != \
                     interval.is_flipped():
             raise RestrictionError("Curve is not transverse to the foliation")
 
@@ -46,14 +46,14 @@ class TransverseCurve(SageObject):
             
 
         self._arc = Arc(sep1.endpoint, sep2.endpoint, *openness)
-        import itertools
-        intersections = itertools.chain(sep1.intersections()[:-1],
-                                        sep2.intersections()[:-1])
+
+        intersections = sep1.intersections_without_endpoint() +\
+                        sep2.intersections_without_endpoint()
 
         # if one of the separatrices is longer, both arcs are considered,
         # so if the current one is wrong, we try the other one
         if coding.num_flips1 > 0 or coding.num_flips2 > 0:
-            x = next(intersections)
+            x = intersections[0]
             if self._arc.contains(x):
                 self._arc = Arc(sep2.endpoint, sep1.endpoint, *openness)
                 self._sep = [sep2, sep1]
@@ -62,8 +62,10 @@ class TransverseCurve(SageObject):
             raise RestrictionError("The curve is one-side and has length"
                                    " greater than half, so we can't compute"
                                    " the train track transition map. ")
-
+        # print self._arc
+        # print sep1, sep2
         for x in intersections:
+            # print x
             if self._arc.contains(x):
                 raise RestrictionError("The curve is self-intersecting")
 
@@ -76,6 +78,19 @@ class TransverseCurve(SageObject):
         s = ''
         s += 'Arc: ' + repr(self._arc) + '(' + repr(self._arc.length()) + ')'
         return s
+
+    def _latex_(self):
+        return self._sep[0].foliation.latex_options().tikz_picture(
+            transverse_curves = [self])
+
+    def separatrix(self, n):
+        return self._sep[n]
+
+    def direction(self):
+        return self._direction
+
+    def arc(self):
+        return self._arc
 
     def coding(self):
         return self._coding
