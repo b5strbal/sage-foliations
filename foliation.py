@@ -524,7 +524,9 @@ class Foliation(SageObject):
             return self._foliation._lengths[self.label()]
 
         def is_wrapping(self):
-            return self.endpoint(0) > self.endpoint(1)
+            return self.endpoint(0) > self.endpoint(1) or \
+                self._foliation.is_bottom_side_moebius() and \
+                self.endpoint(0) < 0.5 and 0.5 < self.endpoint(1)
 
         def is_orienation_reversing(self):
             return self.is_flipped() != (self.pair().side == self.side)
