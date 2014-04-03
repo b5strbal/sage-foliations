@@ -1,6 +1,7 @@
 from sage.structure.sage_object import SageObject
 from mymath import mod_one
 from train_track import TrainTrack
+from constants import *
 
 class Separatrix(SageObject):
     def __init__(self, foliation, interval, end = 0, bounding_arc = None,
@@ -38,6 +39,7 @@ class Separatrix(SageObject):
         p = interval.endpoint(0)
         self._intersections = [p]
         self._tt_path = TrainTrack.Path()
+        self._next_intersection = None
         self._center_lengthen(p, interval)
 
         other_int = interval.prev()
@@ -49,7 +51,7 @@ class Separatrix(SageObject):
         # this is -1 if we are at the last element of self._intersections
         # and -2 if it is the second to last element. Only used when the
         # bottom side is a Moebius band.
-        self._current_index = -2
+        # self._current_index = -2
 
         if bounding_arc == None:
             if number_of_flips_to_stop != None:
@@ -63,7 +65,7 @@ class Separatrix(SageObject):
         else:
             def terminate():
                 return bounding_arc.contains(
-                    self._intersections[self._current_index])
+                    self._intersections[-1])
 
 
         while not terminate():
@@ -74,12 +76,12 @@ class Separatrix(SageObject):
         
     def lengthen(self):
         # crossing the centerline
-        if self._foliation.is_bottom_side_moebius() and self._current_index == -2:
-            self._current_index = -1
+        if self._foliation.is_bottom_side_moebius() and self._next_intersection != None:
+            self._intersections.append(self._next_intersection)
+            self._next_intersection = None
             return
         
         # moving to pair (and crossing center line if not moebius)
-        self._current_index = -2
         last_int = self._tt_path[-1].end()
         if last_int.is_flipped():
             self._flip_count += 1
@@ -95,7 +97,13 @@ class Separatrix(SageObject):
             last_int = self._tt_path[-1].end()
         p, new_int = self._foliation.point_int_on_other_side(p,
                                                     last_int.side)
-        self._intersections.append(p)
+        if self._foliation.is_bottom_side_moebius():
+            self._next_intersection = p
+        else:
+            self._intersections.append(p)
+        # print last_int, new_int
+        # print self._tt_path
+        # print self._intersections, self._next_intersection
         self._tt_path.append(self._tt.get_oriented_edge(last_int, new_int,
                                                     'center', p))
                 
@@ -130,11 +138,13 @@ class Separatrix(SageObject):
         return s
 
     def intersections(self):
-        if self._current_index == -2:
-            return self._intersections[:self._current_index+1]
-        else:
-            return self._intersections
+        return self._intersections
 
+    def get_intersection(self, n):
+        return self._intersections[n]
+
+    def num_intersections(self):
+        return len(self._intersections)
 
     @property
     def foliation(self):
@@ -147,8 +157,8 @@ class Separatrix(SageObject):
     @property
     def end_side(self):
         if self.foliation.is_bottom_side_moebius() and \
-           self._current_index == -1:
-            return 1
+           self.num_intersections() % 2 == 0:
+            return BOTTOM
         return self._tt_path[-1].start().side
     
     @property
@@ -161,7 +171,7 @@ class Separatrix(SageObject):
 
     @property
     def endpoint(self):
-        return self._intersections[self._current_index]
+        return self._intersections[-1]
 
     def first_edge(self, end):
         return self._tt_path[0] if end == 0 else self._other_first_edge
@@ -195,8 +205,7 @@ class Separatrix(SageObject):
 
         
     def _latex_(self):
-        from foliation_latex import FoliationLatex
-        return FoliationLatex(self._foliation).tikz_picture(
+        return self._foliation.latex_options().tikz_picture(
             separatrices = [self])
 
 

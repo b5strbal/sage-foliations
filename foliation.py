@@ -1039,10 +1039,17 @@ v            OUTPUT:
                 self._lengths, self._twist)
 
     def _latex_(self):
-        from foliation_latex import FoliationLatex
-        return FoliationLatex(self).tikz_picture()
+        return self.latex_options().tikz_picture()
 
+    def latex_options(self):
+        if not hasattr(self, '_latex_opts'):
+            from foliation_latex import FoliationLatex
+            self._latex_opts = FoliationLatex(self)
+        return self._latex_opts
 
+    def set_latex_options(self, **kwds):
+        opts = self.latex_options()
+        opts.set_options(**kwds)
 
                 
 

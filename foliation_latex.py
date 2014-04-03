@@ -36,19 +36,24 @@ class FoliationLatex(SageObject):
     """
 
     __default_options = {
-            'scale':15,
-            'color_strength':50,
-            'interval_labelling':True,
-            'length_labelling':True,
-            'separatrix_color':'purple',
-            'separatrix_draw_options':'dashed'
-            }
+        'scale':15,
+        'color_strength':50,
+        'interval_labelling':True,
+        'length_labelling':True,
+        'separatrix_color':'black',
+        'separatrix_draw_options':'dashed,thick',
+        'transverse_curve_color':'red',
+        'transverse_curve_draw_options':'very thick'
+    }
 
     def __init__(self, foliation, **options):
         self._foliation = foliation
         self._options = {}
         self._separatrices = []
         self.set_options(**options)
+
+    def _repr_(self):
+        return repr(self._options)
 
     def set_option(self, option_name, option_value = None):
         if option_value == None:    # clear the option, if set
@@ -70,20 +75,31 @@ class FoliationLatex(SageObject):
         else:
             return self.__default_options[option_name]
 
-    def _tikz_of_separatrix(self, separatrix):
+    def _tikz_of_separatrix(self, separatrix, hshift = None):
 
-        end_x = separatrix.intersections[-1]
-        end_y = self._end_y(separatrix.end_side())
-        draw_options = self.get_option('separatrix_draw_options')
-        cc = ColorConverter()
-        s = '\\definecolor{{separatrixcolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(\
-                *cc.to_rgb(self.get_option('separatrix_color')))
-        s += '\\draw[color=separatrixcolor, {opt}] ({0},0) -- ({0},{1});\n'.format(end_x, end_y, opt = draw_options) 
-        for i in range(len(separatrix.intersections) - 1):
-            x = separatrix.intersections[i]
-            s += '\\draw[color=separatrixcolor, {opt}] ({0},{1}) --'\
-                 ' ({0},0.5);\n'.format(x, self._end_y(1), opt =
-                                 draw_options)
+        if self._foliation.is_bottom_side_moebius() and \
+           separatrix.num_intersections() % 2 == 0:
+            end_index = -2
+        else:
+            end_index = -1
+        end_x = self._adjust_point(separatrix.get_intersection(end_index))
+        end_y = self._get_y(separatrix.end_side, end_x)
+
+
+        draw_options = self.get_option('separatrix_draw_options' if hshift == None
+                                       else 'transverse_curve_draw_options')
+        color = 'separatrixcolor' if hshift == None else 'curvecolor'
+
+        s = '\\draw[color={col}, {opt}] ({x},0) -- ({x},{y});\n'.format(x=end_x,
+                                                                         y=end_y,
+                                                                         opt = draw_options,
+                                                                         col = color) 
+        for i in range((separatrix.num_intersections() - 1) // 2):
+            x = self._adjust_point(separatrix.get_intersection(2*i))
+            s += '\\draw[color={col}, {opt}] ({x},-0.5) --'\
+                 ' ({x},0.5);\n'.format(x=x, opt =
+                                        draw_options,
+                                        col = color)
         return s
 
 
@@ -274,6 +290,15 @@ class FoliationLatex(SageObject):
         lines += '\\draw (1,0) -- (1,{y});\n'\
                 '\\draw[very thick] (0,0) -- (1,0);\n'.format(y=-0.5 if fol.is_bottom_side_moebius()
                                                               else 0.5)
+
+
+        cc = ColorConverter()
+        rgb = cc.to_rgb(self.get_option('separatrix_color'))
+        s += '\\definecolor{{separatrixcolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
+        rgb = cc.to_rgb(self.get_option('transverse_curve_color'))
+        s += '\\definecolor{{curvecolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
+
+
         s += fillings + lines + singularities + labels
         for separatrix in separatrices:
             s += self._tikz_of_separatrix(separatrix)
