@@ -4,6 +4,7 @@ from collections import namedtuple
 from sage.matrix.constructor import matrix
 from sage.rings.integer_ring import ZZ
 from mymath import is_perron_frobenius
+from constants import *
 
 class OrientedEdge(namedtuple('OrientedEdge', 'edge, direction')):
     def __new__(cls, edge, direction):
@@ -51,13 +52,9 @@ class TrainTrack(SageObject):
                 edge_count += 1
 
         for interval in foliation.intervals():
-            if not foliation.is_bottom_side_moebius():
-                otherside = (interval.side + 1) % 2
-                containing_int = foliation.in_which_interval(\
-                        interval.endpoint(0), otherside)
-            else:
-                containing_int = foliation.in_which_interval(\
-                        mod_one(interval.endpoint(0) + 0.5), 0)
+            side = interval.endpoint_side(LEFT)
+            containing_int = foliation.in_which_interval(\
+                            interval.endpoint(LEFT), (side + 1) % 2)
             self._from['center'][interval] = containing_int
             edge = (interval, containing_int, 'center')
             self._edge_to_index[edge] = edge_count
@@ -142,7 +139,7 @@ class TrainTrack(SageObject):
             return OrientedEdge(self.get_edge_from(from_vertex, 'center'), 1)
         other_int = self._from['center'][from_vertex.next()]
         return self.get_oriented_edge(from_vertex, other_int, 'center',
-                                      from_vertex.endpoint(1))
+                                      from_vertex.raw_endpoint(RIGHT))
 
 
     def get_oriented_edge(self, from_vertex, to_vertex, edge_type,
@@ -153,11 +150,15 @@ class TrainTrack(SageObject):
                       for i in range(2)
                       if v[i] in self._from[edge_type] and
                       self._from[edge_type][v[i]] == v[(i+1)%2]]
+
         if len(candidates) == 1:
             return candidates[0]
         elif len(candidates) == 2:
-            top_interval = from_vertex if from_vertex.side == 0 else to_vertex
-            if (crossing < top_interval.midpoint()) == (from_vertex.side == 0):
+            # this case may only happen if the foliation is two-sided
+            assert(not self._foliation.is_bottom_side_moebius())
+            bottom_interval = from_vertex if from_vertex.side == BOTTOM else to_vertex
+            if (crossing <= bottom_interval.endpoint(RIGHT)) == \
+               (from_vertex.side == TOP):
                 return candidates[0]
             return candidates[1]
             

@@ -3,7 +3,7 @@ from sage.structure.sage_object import SageObject
 
 from matplotlib.colors import ColorConverter
 from foliation import mod_one
-from constants import TOP, BOTTOM, LEFT, RIGHT, epsilon
+from constants import *
 
 _tikzcolors = ["red", "green", "blue", "cyan", "magenta", "yellow", 
     "gray", "brown", "lime", "olive", "orange", "pink", "purple", 
@@ -82,8 +82,7 @@ class FoliationLatex(SageObject):
     def _tikz_of_curve(self, transverse_curve):
         arcshift = RIGHT if transverse_curve.direction() == 'left' else LEFT
         ep = [transverse_curve.arc()[i] for i in [0,1]]
-        u, v = [self._shift_point(self._adjust_point(ep[i]),
-                                  arcshift) for i in [0,1]]
+        u, v = [shift_point(ep[i], arcshift) for i in [0,1]]
         
         if u < v:
             s = self._draw_segment(u, v)
@@ -107,31 +106,29 @@ class FoliationLatex(SageObject):
         opts = 'separatrix opts' if hshift == None else 'curve opts'
 
         s = ''
-        for i in range((separatrix.num_intersections() - 1) // 2):
-            x = self._adjust_point(separatrix.get_intersection(2*i))
-            x = self._shift_point(x, hshift)
+        for i in range(separatrix.num_intersections() - 1):
+            x = separatrix.get_intersection(i)
+            x = shift_point(x, hshift)
             s += '\\draw[color={col}, {opt}] ({x},-0.5) --'\
                  ' ({x},0.5);\n'.format(x=x, opt = opts,
                                         col = color)
             if separatrix.get_tt_edge(2 * i + 1).start().is_flipped():
                 hshift = (hshift + 1) % 2 if hshift != None else None
 
+        # # the following correction is necessary to handle the difference
+        # # between a separatrix that stops just before the Moebius band
+        # # and another that stops right after it.
         # if self._foliation.is_bottom_side_moebius() and \
         #    separatrix.num_intersections() % 2 == 0:
         #     end_index = -2
         # else:
         #     end_index = -1
-        x = separatrix.get_intersection(-1)
-        end_x = self._adjust_point(x)
-        end_x = self._shift_point(end_x, hshift)
-        end_y = self._get_y(separatrix.end_side, x)
-
-
+        end_x = shift_point(separatrix.endpoint, hshift)
+        end_y = get_y(separatrix.end_side())
         s += '\\draw[color={col}, {opt}] ({x},0) -- ({x},{y});\n'.format(x=end_x,
                                                                          y=end_y,
                                                                          opt = opts,
                                                                          col = color)
-
         return s
 
 
@@ -153,8 +150,8 @@ class FoliationLatex(SageObject):
 
     def _tikz_of_train_track_edge(self, edge):
         s = ''
-        m = [self._adjust_point(edge[i].midpoint()) for i in [0,1]]
-        y = [self._get_y(edge[i].side, edge[i].midpoint())/2 for i in [0,1]]
+        m = [edge[i].endpoint(MID) for i in [0,1]]
+        y = [get_y(edge[i].endpoint_side(MID))/2 for i in [0,1]]
         if edge[2] == 'pair':
             return "".join(['\\fill ({x},{y1}) circle (0.005);\n'\
                 '\\draw[->-={pos}] ({x},{y1}) -- ({x},{y2});\n'.format(
@@ -168,18 +165,18 @@ class FoliationLatex(SageObject):
         
         shift = 0.5 if self._foliation.is_bottom_side_moebius() else 0.0
 
-        overlap_length = min(mod_one(edge[1].endpoint(1) + shift -
-                                     edge[0].endpoint(0)),
-                             mod_one(edge[0].endpoint(1) -
-                                     edge[0].endpoint(0)))
+        overlap_length = min(mod_one(edge[1].raw_endpoint(1) + shift -
+                                     edge[0].raw_endpoint(0)),
+                             mod_one(edge[0].raw_endpoint(1) -
+                                     edge[0].raw_endpoint(0)))
         # right_endpoint = mod_one(edge[0].endpoint(0) + overlap_length)
 
         x = []
         fac = 1 if self._foliation.is_bottom_side_moebius() else 0.5
         x.append(m[0] - edge[0].length()*fac + overlap_length*fac)
         x.append(m[1] - edge[1].length()*fac +
-                 2*mod_one(edge[0].endpoint(0) + shift -
-                         edge[1].endpoint(0))*fac + overlap_length*fac)
+                 2*mod_one(edge[0].raw_endpoint(0) + shift -
+                         edge[1].raw_endpoint(0))*fac + overlap_length*fac)
                              
             
         transformations = [{''}, {''}]        
@@ -268,10 +265,9 @@ class FoliationLatex(SageObject):
                 if interval > interval.pair():
                     begin_percent, end_percent = end_percent, begin_percent
 
-            x = [self._adjust_point(interval.endpoint(i)) for i in
-                 [LEFT, RIGHT]]
-            midx = self._adjust_point(interval.midpoint())
-            y = [self._get_y(interval.side, interval.endpoint(i)) for i in [LEFT, RIGHT]]
+            x = [interval.endpoint(i) for i in [LEFT, RIGHT]]
+            midx = interval.endpoint(MID)
+            y = [get_y(interval.endpoint_side(i)) for i in [LEFT, RIGHT]]
             color = _tikzcolor(self._foliation.index_of_label(
                 interval.label()))
             if x[1] == 0:
@@ -310,7 +306,7 @@ class FoliationLatex(SageObject):
             sing_color = _tikzcolor(interval.which_singularity())
             singularities += '\\filldraw[fill={col}, draw = black] ({x0},{y0}) '\
                     'circle (0.005);\n'.format(x0=x[0],y0=y[0], col = sing_color)
-            midy = self._get_y(interval.side,interval.midpoint())
+            midy = get_y(interval.endpoint_side(MID))
             above_or_below = 'above' if midy == 0.5 else 'below'
 
             if length_labelling:
@@ -352,29 +348,34 @@ class FoliationLatex(SageObject):
         s += '\\end{tikzpicture}\n'
         return s
 
-    def _adjust_point(self, x):
-        if not self._foliation.is_bottom_side_moebius():
-            return x
-        if x > 0.5 - epsilon:
-            return 2 * (x - 0.5)
-        return 2 * x
+    # def _adjust_point(self, x):
+    #     if not self._foliation.is_bottom_side_moebius():
+    #         return x
+    #     if x > 0.5 - epsilon:
+    #         return 2 * (x - 0.5)
+    #     return 2 * x
 
-    def _shift_point(self, x, direction = None):
-        if direction == None:
-            return x
-        SHIFT_BY = 0.005
-        return x - SHIFT_BY * (-1) ** direction
 
-    def _get_side(self, side, point):
-        if not self._foliation.is_bottom_side_moebius():
-            return side
-        if point < 0.5:
-            return TOP
-        else:
-            return BOTTOM
+    # def _get_side(self, side, point):
+    #     if not self._foliation.is_bottom_side_moebius():
+    #         return side
+    #     if point < 0.5:
+    #         return TOP
+    #     else:
+    #         return BOTTOM
 
-    def _get_y(self, side, point):
-        return (-1)**self._get_side(side, point) * 0.5
+    # def _get_y(self, side, point):
+    #     return (-1)**self._get_side(side, point) * 0.5
+
+def shift_point(x, direction = None):
+    if direction == None:
+        return x
+    SHIFT_BY = 0.005
+    return x - SHIFT_BY * (-1) ** direction
+
+
+def get_y(side):
+    return (-1)**side * 0.5
 
 
 def center_edge_piece(x1, y1, x2, y2, transformations = '',

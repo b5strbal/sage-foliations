@@ -4,20 +4,30 @@ from foliation import Foliation, SaddleConnectionError
 from mymath import mod_one
 from constants import *
 
-def new_foliation(separatrices, starting_point, starting_side,
+def new_foliation(separatrices, adj_starting_point, adj_starting_side,
                       is_one_sided = False, direction = 'right',
-                      ending_point = None, lift_type = None):
-    separatrices = sorted_separatrices(separatrices, starting_point,
-                                       starting_side, is_one_sided,
-                                       direction)
+                      adj_ending_point = None, lift_type = None):
+
+
+    if adj_ending_point == None:
+        arc_length = 1
+        adj_ending_point = adj_starting_point
+    else:
+        arc_length = mod_one(adj_ending_point - adj_starting_point)
+
+    start_of_new_fol = adj_starting_point if direction == 'right' else \
+                       adj_ending_point
+
+    if lift_type == 'surface' and is_one_sided:
+        separatrices = double_separatrices(separatrices)
+    else:
+        separatrices = sorted_separatrices(separatrices, start_of_new_fol,
+                                           adj_starting_side, is_one_sided,
+                                           direction)
 
     # print separatrices
-    # print direction, starting_point, ending_point, starting_side
-    if ending_point == None:
-        arc_length = 1
-        ending_point = starting_point
-    else:
-        arc_length = mod_one(ending_point - starting_point)
+    # print direction, adj_starting_point, adj_ending_point, adj_starting_side
+
 
     flips = set()
     remaining_labels = range((len(separatrices[0]) +
@@ -51,8 +61,8 @@ def new_foliation(separatrices, starting_point, starting_side,
                                           side, i, end,
                                           lift_type,
                                           direction,
-                                          ending_point if direction == 'right' else
-                                          starting_point,
+                                          adj_ending_point if direction == 'right' else
+                                          adj_starting_point,
                                           do_we_cut = arc_length < 1)
 
             p = path_entries[(side, i, 0)]
@@ -66,9 +76,11 @@ def new_foliation(separatrices, starting_point, starting_side,
             if direction == 'left':
                 s1, s2 = s2, s1
             lengths[label] = mod_one(s2.endpoint - s1.endpoint)
-            if i == len(separatrices[side]) - 1 or s1.end_side != s2.end_side:
+            if i == len(separatrices[side]) - 1 or \
+               side_of_sep(s1, adj_starting_side, adj_starting_point, direction) !=\
+               side_of_sep(s2, adj_starting_side, adj_starting_point, direction):
                 # the first condition is for the case when the transverse curve
-                # is orientable, the secong is for non-orientable
+                # is orientable, the second is for non-orientable
                 lengths[label] -= 1 - arc_length
 
     # print lengths
@@ -76,8 +88,8 @@ def new_foliation(separatrices, starting_point, starting_side,
 
     x = sum(list(lengths.values()))
     y = arc_length
-    if y == 1 and old_fol.is_bottom_side_moebius():
-        y = 0.5
+    if old_fol.is_bottom_side_moebius():
+        y = 2
     if abs(x - y) > epsilon:
         print x, y
         print old_fol
@@ -113,10 +125,10 @@ def get_tt_map(old_fol, new_fol, path_entries):
     # more specifically, the long vertical end of it.
     to_be_corrected = []
     if not new_fol.is_bottom_side_moebius():
-        long_path_int = (1, new_fol.num_intervals(1) - 1)
+        long_path_int = (BOTTOM, new_fol.num_intervals(1) - 1)
         
     else:
-        side, pos = new_fol.in_which_interval(0.5, 0)
+        side, pos = new_fol.in_which_interval(0, BOTTOM)
         long_path_int = (0, pos)
         
     # Also, finding the intervals on the opposite side of it that will need
@@ -275,9 +287,13 @@ def get_pair_and_path(separatrices, side, i, end,
     if not (begin_cut or end_cut) or not do_we_cut:
         return PathEntry(new_side,new_i,end,path)
 
+    # print side, i, end
+    # print new_side, new_i, end
     # print '------------'
     # print path
     # print '------------'
+    # print s0
+    # print s1
 
     p0 = p1 = None
     if ending_point in s0.intersections():
@@ -304,41 +320,65 @@ def get_pair_and_path(separatrices, side, i, end,
 
 def matching_sep_index(separatrices, interval, lift_type,
                        is_flipped_so_far, orig_side):
+    fol = separatrices[0][0].foliation
     for side in range(2):
         for j in range(len(separatrices[side])):
             s = separatrices[side][j]
             is_total_flipped = (s.is_flipped() != is_flipped_so_far)
+            adjusted_side = side if fol.is_bottom_side_moebius() else \
+                            s.end_side()
             if s.first_interval(0) == interval:
                 
                 if lift_type == None or \
                    lift_type == 'foliation' and not is_total_flipped or \
                    lift_type == 'surface' and \
-                   (s.end_side == orig_side) == is_total_flipped:
+                    (adjusted_side == orig_side) == is_total_flipped: 
                     return (side, j)
     
     assert(False)
 
 
 
-def sorted_separatrices(separatrices, starting_point, starting_side,
+def sorted_separatrices(separatrices, start_of_new_fol, starting_side,
                         is_one_sided, direction = 'right'):
     def distance(sep):
         if direction == 'right':
-            return mod_one(sep.endpoint - starting_point)
+            return mod_one(sep.endpoint - start_of_new_fol)
         else:
-            return mod_one(starting_point - sep.endpoint)
-        
+            return mod_one(start_of_new_fol - sep.endpoint)
+
 
     seps = [sorted([s for s in separatrices if 
-                    s.end_side == side],
+                    side_of_sep(s, starting_side, 
+                                start_of_new_fol, direction) == side],
                    key = distance)
-            for side in {0, 1}]
+            for side in [TOP,BOTTOM]]
 
-    if starting_side == 1:
-        seps = list(reversed(seps))
+    # if starting_side == 1:
+    #     seps = list(reversed(seps))
     
     if is_one_sided:
         seps[0].extend(seps[1])
         seps[1] = []
-        
+
+
+    # print seps
     return seps
+
+
+
+def side_of_sep(sep, starting_side, start_of_new_fol, direction):
+    fol = sep.foliation        
+    if not fol.is_bottom_side_moebius():
+        return TOP if sep.end_side() == starting_side else BOTTOM
+    ep = sep.endpoint
+    on_start_side = direction == 'right' and start_of_new_fol <= ep or\
+                    direction == 'left' and start_of_new_fol >= ep
+    on_same_side = starting_side == sep.end_side()
+    # print sep, on_start_side, on_same_side, direction, start_of_new_fol, ep
+    return TOP if on_same_side == on_start_side else BOTTOM
+
+def double_separatrices(separatrices):
+    i = next(i for i in range(len(separatrices))
+             if separatrices[i].endpoint > separatrices[i+1].endpoint)
+    return [separatrices, separatrices[i+1:] + separatrices[:i+1]]

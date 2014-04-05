@@ -35,6 +35,8 @@ def mod_one(x):
     from sage.functions.other import floor 
     return x - floor(x)
 
+# def tomob(x):
+#     return mod_one(2 * x)
 
 class OrientedGraph(SageObject):
     def __init__(self, square_matrix):

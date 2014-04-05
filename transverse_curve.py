@@ -2,7 +2,7 @@ from separatrix import Separatrix
 from arc import Arc
 from collections import namedtuple
 from sage.structure.sage_object import SageObject
-
+from constants import *
 
 class RestrictionError(Exception):
     def __init__(self, value):
@@ -41,14 +41,14 @@ class TransverseCurve(SageObject):
             openness = ('closed','open')
 
         self._sep = [sep1, sep2]
+        # print self._sep
         arcs = [Arc(self._sep[i].endpoint, self._sep[(i+1)%2].endpoint,
                     *openness) for i in range(2)]
             
 
         self._arc = Arc(sep1.endpoint, sep2.endpoint, *openness)
 
-        intersections = sep1.intersections_without_endpoint() +\
-                        sep2.intersections_without_endpoint()
+        intersections = sep1.intersections()[:-1] + sep2.intersections()[:-1]
 
         # if one of the separatrices is longer, both arcs are considered,
         # so if the current one is wrong, we try the other one
@@ -58,10 +58,12 @@ class TransverseCurve(SageObject):
                 self._arc = Arc(sep2.endpoint, sep1.endpoint, *openness)
                 self._sep = [sep2, sep1]
 
-        if self._arc.length() > 0.5 and sep1.end_side == sep2.end_side:
-            raise RestrictionError("The curve is one-side and has length"
-                                   " greater than half, so we can't compute"
-                                   " the train track transition map. ")
+        # if self._arc.length() > 0.5 and sep1.end_side == sep2.end_side:
+        #     raise RestrictionError("There is either no such curve without "
+        #                            "self-intersection or "
+        #                            "the curve is one-sided and has length"
+        #                            " greater than half, so we can't compute"
+        #                            " the train track transition map. ")
         # print self._arc
         # print sep1, sep2
         for x in intersections:
@@ -76,12 +78,19 @@ class TransverseCurve(SageObject):
 
     def _repr_(self):
         s = ''
-        s += 'Arc: ' + repr(self._arc) + '(' + repr(self._arc.length()) + ')'
+        s += 'Arc: ' + repr(self._arc) #+ '(' + repr(self._arc.length()) + ')'
         return s
 
     def _latex_(self):
-        return self._sep[0].foliation.latex_options().tikz_picture(
-            transverse_curves = [self])
+        return self._foliation.latex_options().tikz_picture(
+            transverse_curves = [self], separatrices = self._get_separatrices())
+
+    def _get_separatrices(self):
+        return Separatrix.get_all(self._foliation, self._arc)
+
+    @property
+    def _foliation(self):
+        return self._sep[0].foliation
 
     def separatrix(self, n):
         return self._sep[n]
@@ -96,19 +105,25 @@ class TransverseCurve(SageObject):
         return self._coding
                            
     def is_one_sided(self):
-        return self._sep[0].end_side == self._sep[1].end_side
+        is_same_side = self._sep[0].end_side() == self._sep[1].end_side()
+        return self.is_twisted() != is_same_side
+
+    def is_twisted(self):
+        return self._foliation.is_bottom_side_moebius() and \
+           self._arc[0] > self._arc[1]
+
+        
+        
 
     def new_foliation(self):
-        foliation = self._sep[0].foliation
-        separatrices = Separatrix.get_all(foliation, self._arc)
         from transition_map import new_foliation
-        starting_side = self._sep[0].end_side if self._direction == 'right' \
-                       else self._sep[1].end_side
-        return new_foliation(separatrices, self._sep[0].endpoint,
-                             starting_side,
+        adj_starting_side = self._sep[0].end_side() if self._direction == 'right' \
+                       else self._sep[1].end_side()
+        return new_foliation(self._get_separatrices(), self._sep[0].endpoint,
+                             adj_starting_side,
                              is_one_sided = self.is_one_sided(),
                              direction = self._direction,
-                             ending_point = self._sep[1].endpoint)
+                             adj_ending_point = self._sep[1].endpoint)
 
 
 

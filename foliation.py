@@ -4,7 +4,7 @@ from collections import namedtuple
 from sage.matrix.constructor import vector
 from mymath import mod_one
 
-from constants import epsilon
+from constants import *
 
 
 
@@ -488,6 +488,18 @@ class Foliation(SageObject):
         """
         return self._index_of_label[label]
 
+    def raw_to_adj(self, raw_x):
+        return mod_one(2 * raw_x) if self.is_bottom_side_moebius() else raw_x
+
+    def _get_side(self, raw_point, raw_side):
+        if not self.is_bottom_side_moebius():
+            return raw_side
+        return TOP if raw_point < 0.5 else BOTTOM
+
+    def adj_to_raw(self, adj_x, adj_side):
+        return adj_side * Rational('1/2') + adj_x/2 \
+            if self.is_bottom_side_moebius() else adj_x
+
     class Interval(namedtuple('Interval', 'side, index')):
         def __new__(cls, side, index, foliation):
             self = super(Foliation.Interval, cls).__new__(cls, side, index)
@@ -504,12 +516,20 @@ class Foliation(SageObject):
             return self._foliation._all_intervals[self.side][(self.index + n) 
                     % self._foliation.num_intervals(self.side)]
 
-        def endpoint(self, pos):
-            return self._foliation._divvalues[self.side][(self.index + pos)
+        def raw_endpoint(self, hdir):
+            new_hdir = LEFT if hdir == MID else hdir
+            x = self._foliation._divvalues[self.side][(self.index + new_hdir)
                     % self._foliation.num_intervals(self.side)]
+            if hdir == MID:
+                return mod_one(x + self.length()/2)
+            else:
+                return x
 
-        def midpoint(self):
-            return mod_one(self.endpoint(0) + self.length()/2)
+        def endpoint(self, hdir):
+            return self._foliation.raw_to_adj(self.raw_endpoint(hdir))
+
+        def endpoint_side(self, hdir):
+            return self._foliation._get_side(self.raw_endpoint(hdir), self.side)
 
         def next(self):
             return self.add_to_position(1)
@@ -524,9 +544,7 @@ class Foliation(SageObject):
             return self._foliation._lengths[self.label()]
 
         def is_wrapping(self):
-            return self.endpoint(0) > self.endpoint(1) or \
-                self._foliation.is_bottom_side_moebius() and \
-                self.endpoint(0) < 0.5 and 0.5 < self.endpoint(1)
+            return self.endpoint(LEFT) > self.endpoint(RIGHT)
 
         def is_orienation_reversing(self):
             return self.is_flipped() != (self.pair().side == self.side)
@@ -1053,7 +1071,7 @@ v            OUTPUT:
 
                 
 
-    def in_which_interval(self, value, side):
+    def in_which_interval(self, point, side):
         r"""
         Finds the containing interval of a value on the specified side.
 
@@ -1098,28 +1116,31 @@ v            OUTPUT:
 
         """
         from bisect import bisect
-        interval = bisect(self._divvalues[side], value)
-        if side == 0 or not self.is_bottom_side_moebius():
-            if interval == 0:
-                to_check = {self._divvalues[side][0]}
-            elif interval == len(self._divvalues[side]):
-                to_check = {self._divvalues[side][interval - 1],
-                        self._divvalues[side][0] + 1}
-            else:
-                to_check = {self._divvalues[side][k]
-                        for k in {interval - 1, interval}}
+        raw_point = self.adj_to_raw(point, side)
+        raw_side = 0 if self.is_bottom_side_moebius() else side
+        interval = bisect(self._divvalues[raw_side], raw_point)
 
-            if any(abs(value - x) < epsilon for x in to_check):
-                # print self
-                # print self._divvalues
-                # print value
-                # print to_check
-                raise SaddleConnectionError()
-        return self._all_intervals[side][(interval - 1) % 
-                self.num_intervals(side)]
+        if interval == 0:
+            to_check = {self._divvalues[raw_side][0]}
+        elif interval == len(self._divvalues[raw_side]):
+            to_check = {self._divvalues[raw_side][interval - 1],
+                    self._divvalues[raw_side][0] + 1}
+        else:
+            to_check = {self._divvalues[raw_side][k]
+                    for k in {interval - 1, interval}}
+
+        if any(abs(raw_point - x) < epsilon for x in to_check):
+            # print self
+            # print self._divvalues
+            # print side, point
+            # print raw_side, raw_point
+            # print to_check
+            raise SaddleConnectionError()
+        return self._all_intervals[raw_side][(interval - 1) % 
+                self.num_intervals(raw_side)]
 
 
-    def apply_iet(self, point, containing_interval):
+    def apply_iet(self, adj_point, adj_side, containing_interval):
         r"""
         Calculates the image of a point under the interval exchange map 
         and also the side and position of the image point.
@@ -1161,21 +1182,24 @@ v            OUTPUT:
             ((1, 0), (0.4, (1, 2, 3, 3, 0)))
 
         """
+        raw_point = self.adj_to_raw(adj_point, adj_side)
         new_int = containing_interval.pair()
-        diff = point - containing_interval.endpoint(0)
+        diff = raw_point - containing_interval.raw_endpoint(LEFT)
         if not containing_interval.is_flipped():
-            return (mod_one(new_int.endpoint(0) + diff), new_int)
+            raw_x = mod_one(new_int.raw_endpoint(LEFT) + diff)
         else:
-            return (mod_one(new_int.endpoint(1) - diff), new_int)
+            raw_x = mod_one(new_int.raw_endpoint(RIGHT) - diff)
 
-    def point_int_on_other_side(self, point, side):
-        if self.is_bottom_side_moebius():
-            p = mod_one(point + Rational('1/2'))
-            new_side = 0
-        else:
-            p = point
-            new_side = (side + 1) % 2
-        return (p, self.in_which_interval(p, new_side))
+        return (self._get_side(raw_x, new_int.side), self.raw_to_adj(raw_x), new_int)
+
+    # def point_int_on_other_side(self, point, side):
+    #     if self.is_bottom_side_moebius():
+    #         p = mod_one(point + Rational('1/2'))
+    #         new_side = 0
+    #     else:
+    #         p = point
+    #         new_side = (side + 1) % 2
+    #     return (p, self.in_which_interval(p, new_side))
 
 
     def rotated(self, n):
@@ -1184,13 +1208,15 @@ v            OUTPUT:
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
         i = self._all_intervals[0][0]
         i = i.add_to_position(-n)
-        return new_foliation(separatrices, i.endpoint(0), 0)
+        return new_foliation(separatrices, i.endpoint(LEFT), i.endpoint_side(LEFT),
+                             is_one_sided = self.is_bottom_side_moebius())
 
     def reversed(self):
         from separatrix import Separatrix
         from transition_map import new_foliation, get_tt_map
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
-        return new_foliation(separatrices, 0, 0, direction = 'left')
+        return new_foliation(separatrices, 0, TOP, direction = 'left',
+                             is_one_sided = self.is_bottom_side_moebius())
                                  
     
 
@@ -1291,11 +1317,14 @@ v            OUTPUT:
             separatrices = [s for s in separatrices
                             if s.first_interval(0).prev() !=
                             s.first_interval(0).pair()]
+
         elif foliation_or_surface == 'surface':
-            separatrices += Separatrix.get_all(self,
-                                        stop_at_first_orientation_reverse=True)
+            if not self.is_bottom_side_moebius():
+                separatrices += Separatrix.get_all(self,
+                                    stop_at_first_orientation_reverse=True)
 
         return new_foliation(separatrices, 0, 0,
-                                 lift_type = foliation_or_surface)[0]
+                             is_one_sided = self.is_bottom_side_moebius(),
+                             lift_type = foliation_or_surface)[0]
         
 
