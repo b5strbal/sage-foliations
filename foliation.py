@@ -5,7 +5,7 @@ from sage.matrix.constructor import vector
 from mymath import mod_one
 
 from constants import *
-
+from myexceptions import SaddleConnectionError
 
 
 # def basis_vector(n, k):
@@ -86,8 +86,6 @@ def arnoux_yoccoz_factor(genus, field = RDF):
 
 
 
-class SaddleConnectionError(Exception):
-    pass
 
 from sage.rings.rational import Rational
 class Foliation(SageObject):
@@ -1024,11 +1022,14 @@ v            OUTPUT:
             True
 
         """
-        
+        return self.equals(other, epsilon)
+
+    def equals(self, other, allowed_error):
         return self.is_bottom_side_moebius() == other.is_bottom_side_moebius()\
                 and self._gen_perm == other._gen_perm and \
                 abs(self._length_twist_vector -
-                    other._length_twist_vector) < epsilon
+                    other._length_twist_vector) < allowed_error
+        
 
     def _repr_(self):
         r"""

@@ -3,13 +3,7 @@ from arc import Arc
 from collections import namedtuple
 from sage.structure.sage_object import SageObject
 from constants import *
-
-class RestrictionError(Exception):
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return self.value
+from myexceptions import RestrictionError, SaddleConnectionError
 
 
 Coding = namedtuple("Coding", "side, index, end, num_flips1, num_flips2")
@@ -17,7 +11,10 @@ Coding = namedtuple("Coding", "side, index, end, num_flips1, num_flips2")
 
 class TransverseCurve(SageObject):
     def __init__(self, foliation, coding):
-        interval = foliation.interval(coding.side, coding.index)
+        try:
+            interval = foliation.interval(coding.side, coding.index)
+        except IndexError:
+            raise RestrictionError("Invalid interval index.")
 
         # Checking if the curve is transverse
         if ((coding.num_flips1 % 2 == 1) != \
@@ -141,11 +138,61 @@ def get_codings(foliation):
                                 
     return codings
 
-PseudoAnosov = namedtuple("PseudoAnosov", "foliation, coding") 
+PseudoAnosov = namedtuple("PseudoAnosov", "foliation, coding, charpoly, eigenvalue,"
+                          "tt_map") 
 
 def find_pseudo_anosovs(foliation, depth):
     candidates = find_pseudo_anosov_candidates(foliation, depth)
-    return candidates
+    print "BAD CANDIDATES: \n"
+    for x in candidates:
+        if not is_really_pseudp_anosov(x):
+            print x, '\n'
+    return [x for x in candidates if is_really_pseudp_anosov(x)]
+
+ALLOWED_ERROR_OF_FOLIATIONS = 0.00001
+
+def print_charpoly(tt_map):
+    m = tt_map.small_matrix()
+    if m.is_square():
+        print m.charpoly()
+    else:
+        print "Small matrix not square."
+    
+
+def is_really_pseudp_anosov(pa):
+    from train_track import TrainTrack
+    fol = pa.foliation
+    tt_map_so_far = TrainTrack.Map.identity(pa.foliation)
+    for coding in pa.coding:
+        # the last two elements of the list are the reversing and the rotation
+        if not isinstance(coding, Coding):
+            break
+        try:
+            tc = TransverseCurve(fol, coding)
+            fol, tt_map = tc.new_foliation()
+        except RestrictionError as ex:
+            print "RestrictionError: ", ex
+            return False
+        except SaddleConnectionError as ex:
+            print "SaddleConnectionError: ", ex
+            return False
+        tt_map_so_far = tt_map_so_far * tt_map
+        print_charpoly(tt_map_so_far)
+        
+    if pa.coding[-2]: # reversed
+        fol, tt_map = fol.reversed()
+        tt_map_so_far = tt_map_so_far * tt_map
+        print_charpoly(tt_map_so_far)
+    
+        
+
+    fol, tt_map = fol.rotated(pa.coding[-1])
+    tt_map_so_far = tt_map_so_far * tt_map
+    print_charpoly(tt_map_so_far)
+    print '\n'
+
+    return pa.foliation.equals(fol, ALLOWED_ERROR_OF_FOLIATIONS)
+            
 
 def find_pseudo_anosov_candidates(foliation, depth,
                                   tt_map_so_far = None,
@@ -168,7 +215,7 @@ def find_pseudo_anosov_candidates(foliation, depth,
             almost_final_coding = coding_so_far + [is_reversed]
         else:
             almost_final_fol = foliation
-            almost_final_coding = coding_so_far
+            almost_final_coding = coding_so_far + [is_reversed]
             almost_final_tt_map = tt_map_so_far
         for rotateby in range(foliation.num_intervals(0)):
             final_fol, tt_map = almost_final_fol.rotated(rotateby)
@@ -203,7 +250,9 @@ def find_pseudo_anosov_candidates(foliation, depth,
                     # with a saddle connection
                     continue
                 # ps = PseudoAnosov((tt_map, almost_final_tt_map, final_tt_map, m.charpoly(), eigenvalue, new_fol), final_coding)
-                ps = PseudoAnosov((m.charpoly(), eigenvalue, new_fol), final_coding)
+                # ps = PseudoAnosov((m.charpoly(), eigenvalue, new_fol), final_coding)
+                ps = PseudoAnosov(new_fol, final_coding, m.charpoly(), eigenvalue,
+                                  final_tt_map)
                 result.append(ps)
                 # result.extend([m, final_tt_map.edge_matrix().transpose()])
 
@@ -224,7 +273,7 @@ def find_pseudo_anosov_candidates(foliation, depth,
                         coding_so_far + [c]))
                         # coding_so_far + [c, tt_map]))
                         # coding_so_far + [c, foliation, m1, m2]))
-        except RestrictionError: # also SaddleConnectionError?
+        except (RestrictionError, SaddleConnectionError):
             pass
     
 

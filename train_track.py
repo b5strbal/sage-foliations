@@ -6,6 +6,7 @@ from sage.rings.integer_ring import ZZ
 from mymath import is_perron_frobenius
 from constants import *
 
+
 class OrientedEdge(namedtuple('OrientedEdge', 'edge, direction')):
     def __new__(cls, edge, direction):
         return super(OrientedEdge, cls).__new__(cls, edge, direction)
@@ -107,27 +108,39 @@ class TrainTrack(SageObject):
             else numints + 1
                     
     def matrix_to_reduce_dimension(self):
+
+        # BUG: when the twist is longer than the first interval, this, and the 
+        # small matrix calculation is buggy
+        
         if hasattr(self, '_reducing_matrix'):
             return self._reducing_matrix
         from copy import copy
         from sage.rings.rational import Rational
         X = self.coboundary_map_from_vertices('train track module')
+        # print 'start'
+        # print X, '\n'
         # flipping the matrix over vertically (so the echelonizing works
         # in the way we want) and transpose
         X = matrix(list(reversed(X.rows()))).transpose()
-        X = X.echelon_form(include_zero_rows = False)
+        X = X.echelon_form()
+        # print X, '\n'
         
         # if the train track is non-orientable, the last row will be a
         # multiple of two, so we have to normalize it and re-echelonize.
         n = X.nrows()
         X = copy(X).with_row_set_to_multiple_of_row(n-1, n-1, Rational('1/2'))
         X = X.echelon_form()
+        # print X, '\n'
 
         # now we need to cut off the identity part of the matrix and
         # append a small block of identity in the different direction
-        X = matrix(list(reversed(X.rows())))
-        X = -matrix(list(reversed(X.columns()[X.nrows():]))).transpose()
+        identity_size = X.nrows() if self._foliation.is_bottom_side_moebius() \
+                        else X.nrows() - 1
+        assert((X[X.nrows()-1, X.nrows()-1] == 1) == (identity_size == X.nrows()))
+        X = matrix(list(reversed(X.rows()[:identity_size])))
+        X = -matrix(list(reversed(X.columns()[identity_size:]))).transpose()
         X = matrix(matrix.identity(X.ncols()).rows() + X.rows())
+        # print X, '\n'
         self._reducing_matrix = X
         return X
 
@@ -207,6 +220,8 @@ class TrainTrack(SageObject):
                
     class Map(namedtuple("TrainTrackMap", "domain, codomain,"
                          "vertex_map, edge_map")):
+
+
         def __mul__(self, other):
             # f*g means g comes first, then f
             # print self.domain.foliation
@@ -220,10 +235,24 @@ class TrainTrack(SageObject):
             new_edge_map = {e:self._map_path(other.edge_map[e])
                             for e in other.edge_map}
                
-            return TrainTrack.Map(domain = other.domain,
+            new_map = TrainTrack.Map(domain = other.domain,
                                   codomain = self.codomain,
                                   vertex_map = new_vertex_map,
                                   edge_map = new_edge_map)
+            # if new_map.edge_matrix() !=
+            #        self.edge_matrix() * other.edge_matrix():
+            # print new_map.edge_matrix(), '\n'
+            # print other.edge_matrix() * self.edge_matrix(), '\n'
+            # print self.edge_matrix(), '\n'
+            # print other.edge_matrix(), '\n'
+            # print other.domain._index_to_edge
+            # print other.codomain._index_to_edge
+            assert(new_map.edge_matrix() ==
+                   other.edge_matrix() * self.edge_matrix())
+            # assert(new_map.small_matrix() ==
+            #        other.small_matrix() * self.small_matrix())
+
+            return new_map
                
         def _map_path(self, path):
             new_path = []
@@ -296,9 +325,14 @@ class TrainTrack(SageObject):
             # condition.
             m = self.domain.matrix_to_reduce_dimension()
             # print m
+            # print self.domain.foliation
+            # print self._edge_matrix, '\n'
             result = m.transpose() * self.edge_matrix()
+            # print result, '\n'
             result = result.matrix_from_columns(range(
                 self.codomain.small_vector_size()))
+            # print result, '\n'
+            
             return result
                                   
         def edge_matrix(self):
@@ -308,6 +342,14 @@ class TrainTrack(SageObject):
                     self.edge_map[edge],
                     signed = False)
                                             for edge in self.domain.edges()])
+                assert(set(self.edge_map.keys()) == set(self.domain.edges())) 
+                # if abs(self.small_matrix().det()) != 1:
+                #     print self._edge_matrix
+                #     print self.small_matrix().det()
+                #     print self
+                #     print self.small_matrix()
+                #     print self.small_matrix().charpoly().factor()
+                # assert(abs(self.small_matrix().det()) == 1)
             return self._edge_matrix
 
             

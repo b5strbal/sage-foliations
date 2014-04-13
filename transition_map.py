@@ -64,6 +64,7 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
                                           adj_ending_point if direction == 'right' else
                                           adj_starting_point,
                                           do_we_cut = arc_length < 1)
+                # print "PE: ", path_entries[(side,i,end)]
 
             p = path_entries[(side, i, 0)]
             label = remaining_labels.pop()
@@ -88,19 +89,19 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
 
     x = sum(list(lengths.values()))
     y = arc_length
-    if old_fol.is_bottom_side_moebius():
-        y = 2
+    # if old_fol.is_bottom_side_moebius():
+    #     y = 2
     if abs(x - y) > epsilon:
         print x, y
         print old_fol
         print lengths
         exit()
 
-    try:
-        new_fol = Foliation(*gen_perm, lengths = lengths,
-                            flips = flips, twist = twist)
-    except SaddleConnectionError:
-        pass
+    # try:
+    new_fol = Foliation(*gen_perm, lengths = lengths,
+                        flips = flips, twist = twist)
+    # except SaddleConnectionError:
+    #     pass
         # print gen_perm, lengths, twist
         # print separatrices
         # print twist
@@ -165,7 +166,7 @@ def get_tt_map(old_fol, new_fol, path_entries):
         # print "tails: ", tails
         # print "center:", center
         # print "long_path_int:", long_path_int
-        # print "Long end:",long_end
+        # print "Long end:", long_end
 
         # computing the path in the long part of the L-shaped strip that has to
         # be appended to some other paths on the other side
@@ -237,10 +238,11 @@ def get_pair_and_path(separatrices, side, i, end,
     if s0.is_flipped():
         end = (end + 1) % 2
 
-    # print s
-    # print end, endpoint
     # converting first separatrix to train track path
+    # print end, s0.is_flipped()
+    # print s0
     path = s0.tt_path(end).reversed()
+    # print path
     
     interval = path[-1].end()
     # adding connecting interval to train track path
@@ -258,6 +260,9 @@ def get_pair_and_path(separatrices, side, i, end,
                                               lift_type,
                                               is_flipped_so_far, side)
     s1 = separatrices[new_side][new_i]
+
+    # converting second separatrix to train track path
+    path.extend(s1.tt_path(end))
     
     if s1.is_flipped():
         end = (end + 1) % 2
@@ -266,12 +271,13 @@ def get_pair_and_path(separatrices, side, i, end,
     if end == 1:
         new_i = (new_i - 1) % len(separatrices[new_side])
 
+    # print s1
     # print new_side, new_i, end
     # print ending_point
 
 
     # converting second separatrix to train track path
-    path.extend(s1.tt_path(end if direction == 'right' else (end + 1)%2))
+    # path.extend(s1.tt_path(end if direction == 'right' else (end + 1)%2))
 
 
     # we need to collect intersections for the special case when we need to
