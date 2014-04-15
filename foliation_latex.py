@@ -152,11 +152,13 @@ class FoliationLatex(SageObject):
         s = ''
         m = [edge[i].endpoint(MID) for i in [0,1]]
         y = [get_y(edge[i].endpoint_side(MID))/2 for i in [0,1]]
+        arrows = ['>','<']
         if edge[2] == 'pair':
             return "".join(['\\fill ({x},{y1}) circle (0.005);\n'\
-                '\\draw[->-={pos}] ({x},{y1}) -- ({x},{y2});\n'.format(
-                pos = (-1)**i * 0.5, x = m[i], y1 = y[i], y2 =2*y[i]) for
-                            i in [0,1]])
+                '\\draw[-{arr}-={pos}] ({x},{y1}) -- ({x},{y2});\n'.format(
+                    pos = (-1)**i * 0.5, x = m[i],
+                    y1 = y[i], y2 =2 * y[i],
+                    arr = arrows[i]) for i in [0,1]])
                             
         clip = edge[0].is_wrapping() or edge[1].is_wrapping()
         if clip:
@@ -237,11 +239,12 @@ class FoliationLatex(SageObject):
 
         s = ''
         if len(train_tracks) > 0:
-            s += '\\tikzset{->-/.style={\n'\
-                 'decoration={markings,\n'\
-                 'mark= at position #1 with {\\arrow{>}},'\
-                 '},\n'\
-                 'postaction={decorate}}}\n'
+            for arrow in ['>', '<']:
+                s += '\\tikzset{-' + arrow + '-/.style={\n'\
+                     'decoration={markings,\n'\
+                     'mark= at position #1 with {\\arrow{' + arrow + '}},'\
+                     '},\n'\
+                     'postaction={decorate}}}\n'
 
         s += '\\begin{{tikzpicture}}[scale = {0},>=stealth\','\
             'font=\\tiny]\n'.format(scale_size)

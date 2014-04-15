@@ -44,42 +44,6 @@ from myexceptions import SaddleConnectionError
 
 
 from sage.rings.real_double import RDF
-def arnoux_yoccoz_factor(genus, field = RDF):
-    """
-    Returns the Perron root of the polynomials 
-    $x^g - x^{g-1} - ... - 1$.
-
-    INPUT:
-
-    - ``genus`` - integer, the genus of the orientable
-      closed Arnoux-Yoccoz surface, which is the same as the degree
-      of the minimalpolynomial.
-
-    - ``field`` - the number field in which roots of the polynomial
-      are searched. The default is RDF, but one want the exact number
-      in QQbar.
-
-    OUTPUT:
-
-    - number -- number type depends on the field specified
-
-    EXAMPLES::
-
-        sage: from sage.dynamics.foliations.foliation import arnoux_yoccoz_factor
-        sage: arnoux_yoccoz_factor(3)
-        1.83928675521
-        sage: arnoux_yoccoz_factor(3, field = QQbar)
-        1.839286755214161?
-
-    """
-    from sage.rings.integer_ring import ZZ
-    from sage.rings.polynomial.polynomial_ring_constructor import \
-        PolynomialRing
-    R = PolynomialRing(ZZ, 't')
-    poly = R([-1] * genus + [1])
-    return max([abs(x[0]) for x in poly.roots(field)])
-
-
 
 
 
@@ -896,95 +860,7 @@ v            OUTPUT:
     def divvalues(self):
         return self._divvalues
 
-
-
-
-    @classmethod
-    def orientable_arnoux_yoccoz(self, genus):
-        r"""
-        Constructs an orientable Arnoux-Yoccoz foliation.
-
-        INPUT:
-
-        - ``genus`` - integer, at least 3, the genus of the surface
-
-        OUTPUT:
-
-        - Foliation -- the Arnoux-Yoccoz foliation of specified genus
-
-        EXAMPLES::
-
-            sage: Foliation.orientable_arnoux_yoccoz(3)
-            1 2 3 4 5 6
-            4 3 6 5 2 1
-            Lengths: (0.271844506346, 0.271844506346, 0.147798871261, 
-                    0.147798871261, 0.0803566223929, 0.0803566223929)
-            Twist: 0.0436890126921
-
-        """
-        if genus < 3:
-            raise ValueError('The genus of an orientable'
-                    'Arnoux-Yoccoz surface is at least 3')
-        n = 2 * genus
-        top = range(1, n + 1)
-        def switch(k):
-            if k % 2 == 0:
-                return k + 1
-            return k - 1
-        bottom = [top[switch(i)] for i in range(n)]
-        sf = arnoux_yoccoz_factor(genus)
-        l = [1 / sf**(i + 1) for i in range(genus)] * 2
-        return Foliation(top, bottom, sorted(l, reverse = True), twist = 1)
-
-    @classmethod
-    def nonorientable_arnoux_yoccoz(self, genus):
-        r"""
-        Constructs an Arnoux-Yoccoz foliation on a non-orientable surface.
-
-        INPUT:
-
-        - ``genus`` - integer, at least 4, the genus of the surface
-
-        OUTPUT:
-
-        - Foliation -- the Arnoux-Yoccoz foliation of specified genus
-
-        EXAMPLES::
-
-            sage: Foliation.nonorientable_arnoux_yoccoz(4)
-            1 1 2 2 3 3
-            Moebius band
-            Lengths: (0.271844506346, 0.147798871261, 0.0803566223929)
-
-        """
-        if genus < 4:
-            raise ValueError('The genus of a non-orientable '
-                    'Arnoux-Yoccoz surface is at least 4')
-        top = sorted(2 * range(1, genus))
-        sf = arnoux_yoccoz_factor(genus - 1)
-        return Foliation(top, 'moebius',[1/sf**i for i in range(genus - 1)])
-
-    @classmethod
-    def RP2_arnoux_yoccoz(self):
-        r"""
-        Constructs the Arnoux-Yoccoz foliation on RP2.
-
-        OUTPUT:
-
-        - Foliation -- the Arnoux-Yoccoz foliation on RP2
-
-        EXAMPLES::
-
-            sage: Foliation.RP2_arnoux_yoccoz()
-            -a -a -b -b -c -c
-            Moebius band
-            Lengths: (0.209821688804, 0.114077746827, 0.176100564369)
-
-        """
-        sf = arnoux_yoccoz_factor(3)
-        return Foliation('a a b b c c', 'moebius',
-                [1/sf + 1/sf**2, 1/sf**2 + 1/sf**3, 1/sf + 1/sf**3],
-                flips = 'abc')
+        
 
     def with_changed_lengths(self, length_vector):
         if self.is_bottom_side_moebius():

@@ -7,4 +7,10 @@ END = 1
 TOP = 0
 BOTTOM = 1
 
+SIGNED = 0
+UNSIGNED = 1
+
+TRAIN_TRACK_MODULE = 0
+COHOMOLOGY = 1
+
 epsilon = 1e-10

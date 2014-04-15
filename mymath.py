@@ -1,7 +1,12 @@
 from sage.structure.sage_object import SageObject
 from collections import deque
 from sage.matrix.constructor import matrix, vector
+from sage.symbolic.ring import var
+from sage.rings.integer_ring import ZZ
+from sage.rings.polynomial.polynomial_ring_constructor import \
+    PolynomialRing
 from constants import epsilon
+from sage.functions.other import floor 
 
 def mod_one(x):
     """
@@ -32,7 +37,6 @@ def mod_one(x):
         0.4142135623730951?
 
     """
-    from sage.functions.other import floor 
     return x - floor(x)
 
 # def tomob(x):
@@ -73,6 +77,31 @@ class OrientedGraph(SageObject):
         # once it is strongly connected, it is primitive if and only if
         # the gcd of cycle lengths in 1
         return gcd(list(C)) == 1
+
+
+def fixed_charpoly(M, variables):
+    sub_vars = {v : var(str(v) + 'inv') for v in variables}
+    # print sub_vars
+    ring = PolynomialRing(ZZ, variables + sub_vars.values()) \
+           if len(variables) > 0 else ZZ
+    new_M = matrix(ring, M.nrows(), M.ncols())
+    for i in xrange(M.nrows()):
+        for j in xrange(M.ncols()):
+            exp = M[i,j]
+            a = exp.numerator()
+            b = exp.denominator()
+            # print a, b, b.subs(sub_vars)
+            new_M[i,j] = a * b.subs(sub_vars)
+    # print new_M
+    # print new_M.parent()
+    poly = new_M.charpoly('x')
+    back_sub = {str(sub_vars[v]) : 1/v for v in sub_vars}
+    # print poly
+    # print poly.parent()
+    # print back_sub
+    poly = poly.subs(**back_sub)
+    return poly
+
             
 def matrix_to_adj_list(square_matrix):
     n = square_matrix.nrows()
