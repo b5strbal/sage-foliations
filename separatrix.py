@@ -1,6 +1,6 @@
 from sage.structure.sage_object import SageObject
 from mymath import mod_one
-from train_track import TrainTrack
+from train_track import TrainTrackPath
 from constants import *
 
 class Separatrix(SageObject):
@@ -35,20 +35,21 @@ class Separatrix(SageObject):
         assert(not self._foliation.is_bottom_side_moebius() or 
                 interval.side == 0) # otherwise it is not a real separatrix
         self._flip_count = 0
-        interval = interval.add_to_position(end)
-        p = interval.endpoint(LEFT)
-        self._end_side = interval.endpoint_side(LEFT)
+        interval = interval.add_to_position(end, foliation)
+        p = interval.endpoint(LEFT, foliation)
+        self._end_side = interval.endpoint_side(LEFT, foliation)
 
         self._intersections = [p]
-        self._tt_path = TrainTrack.Path()
+        self._tt_path = TrainTrackPath()
         self._center_lengthen(p, interval)
 
 
-        other_int = interval.prev()
+        other_int = interval.prev(foliation)
         new_int = self._tt_path[-1].end()
         self._other_first_edge = self._tt.get_oriented_edge(other_int,
                                                             new_int,
-                                                            'center',p)
+                                                            'center',p,
+                                                            foliation)
 
         if bounding_arc == None:
             if number_of_flips_to_stop != None:
@@ -80,7 +81,7 @@ class Separatrix(SageObject):
         
         # moving to pair (and crossing center line if not moebius)
         last_int = self._tt_path[-1].end()
-        if last_int.is_flipped():
+        if last_int.is_flipped(self._foliation):
             self._flip_count += 1
         self._end_side, p, new_int = self._foliation.apply_iet(self._intersections[-1],
                                                                self._end_side,
@@ -102,7 +103,8 @@ class Separatrix(SageObject):
         # print self._tt_path
         new_int = self._foliation.in_which_interval(p, self._end_side)
         self._tt_path.append(self._tt.get_oriented_edge(last_int, new_int,
-                                                        'center', p))
+                                                        'center', p,
+                                                        self._foliation))
 
 
 
@@ -121,7 +123,7 @@ class Separatrix(SageObject):
     def tt_path(self, end, endpoint = None, to_keep = 'before'):
         first_edge = self._tt_path[0] if end == 0 else \
                 self._other_first_edge
-        path = TrainTrack.Path([first_edge] + self._tt_path[1:])
+        path = TrainTrackPath([first_edge] + self._tt_path[1:])
         if endpoint == None:
             return path
         # return path
@@ -134,9 +136,9 @@ class Separatrix(SageObject):
             cutting_index += 1
 
         if to_keep == 'before':
-            return TrainTrack.Path(path[:2*cutting_index+1])
+            return TrainTrackPath(path[:2*cutting_index+1])
         if to_keep == 'after':
-            return TrainTrack.Path(path[2*cutting_index:])
+            return TrainTrackPath(path[2*cutting_index:])
 
     def _repr_(self):
         s = "Intersections: "
@@ -193,9 +195,9 @@ class Separatrix(SageObject):
     def endpoint(self):
         return self._intersections[-1]
 
-    def raw_endpoint(self):
-        return self._foliation.adj_to_raw(self.endpoint,
-                                          self.end_side())
+    # def raw_endpoint(self):
+    #     return self._foliation.adj_to_raw(self.endpoint,
+    #                                       self.end_side())
 
     def first_edge(self, end):
         return self._tt_path[0] if end == 0 else self._other_first_edge

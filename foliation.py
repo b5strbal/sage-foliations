@@ -1,9 +1,9 @@
 from sage.dynamics.interval_exchanges.constructors import GeneralizedPermutation
 from sage.structure.sage_object import SageObject
-from collections import namedtuple
 from sage.matrix.constructor import vector
 from mymath import mod_one
 
+from interval import Interval
 from constants import *
 from myexceptions import SaddleConnectionError
 
@@ -284,8 +284,8 @@ class Foliation(SageObject):
             self._lengths['JOKER'] = sum(self._lengths.values())
             twist = 0
 
-        totals = [sum(interval.length() for interval in 
-            self._all_intervals[side]) for side in {0,1}]
+        totals = [sum(interval.length(self) for interval in 
+                      self._all_intervals[side]) for side in [0,1]]
 
         if abs(totals[0] - totals[1]) > epsilon:
             raise ValueError('The total length on the top and '
@@ -294,8 +294,8 @@ class Foliation(SageObject):
         #adjusting lengths in case they 
         #differ slightly on top/bottom
         for interval in self._all_intervals[0]:
-            if interval.pair().side == interval.side:
-                self._lengths[interval.label()] += \
+            if interval.pair(self).side == interval.side:
+                self._lengths[interval.label(self)] += \
                         (totals[1] - totals[0])/2
                 break
 
@@ -305,7 +305,7 @@ class Foliation(SageObject):
 
         for interval in self._all_intervals[0] + self._all_intervals[1]:
             self._divvalues[interval.side].append(self._divvalues[
-                interval.side][-1] + self._lengths[interval.label()])
+                interval.side][-1] + self._lengths[interval.label(self)])
         for side in {0,1}:
             self._divvalues[side].pop()
 
@@ -322,7 +322,7 @@ class Foliation(SageObject):
         self._divvalues[1] = [self._twist]
         for interval in self._all_intervals[1][:-1]:
             self._divvalues[1].append(self._divvalues[1][-1] + 
-                    interval.length())
+                                      interval.length(self))
         
         self._length_twist_vector = [0] * len(self._lengths)
         self._length_twist_vector.append(self._twist)
@@ -347,19 +347,19 @@ class Foliation(SageObject):
             edge_circles.append([])
             end = 0 # we start from the left side of the interval
             while True:
-                sing_index = new_interval if end == 0 else new_interval.next()
+                sing_index = new_interval if end == 0 else new_interval.next(self)
                 if sing_index == interval and len(partition[-1]) > 0:
                     break
                 done.add(sing_index)
                 partition[-1].append(sing_index)
                 edge_circles[-1].append(tt.get_center_edge(new_interval, end))
                 end = (end + 1) % 2
-                new_interval = new_interval.add_to_position((-1)**end)
+                new_interval = new_interval.add_to_position((-1)**end, self)
                 edge_circles[-1].append(tt.get_center_edge(new_interval, end).reversed())
                 edge_circles[-1].append(tt.get_oriented_edge(new_interval,
-                                            new_interval.pair(), 'pair'))
-                new_interval = new_interval.pair()
-                if new_interval.is_flipped():
+                                                new_interval.pair(self), 'pair'))
+                new_interval = new_interval.pair(self)
+                if new_interval.is_flipped(self):
                     end = (end + 1) % 2
                 
         self._singularity_partition = partition
@@ -382,9 +382,9 @@ class Foliation(SageObject):
         self._pair = {}
         for side in {0, 1}:
             for index in range(len(self._gen_perm_list[side])):
-                interval = self.Interval(side, index, self)
+                interval = Interval(side, index)
                 self._all_intervals[side].append(interval)
-                label = interval.label()
+                label = interval.label(self)
                 if label not in self._index_of_label:
                     self._index_of_label[label] = count
                     count += 1
@@ -402,14 +402,17 @@ class Foliation(SageObject):
             return self._all_intervals[0]
         return self._all_intervals[0] + self._all_intervals[1]
 
-    def interval(self, side, index):
-        return self._all_intervals[side][index]
+    # def interval(self, side, index):
+    #     return self._all_intervals[side][index]
 
     def num_intervals(self, side):
         return len(self._gen_perm[side])
 
     def labels(self):
         return self._gen_perm_list
+
+    def length_of_label(self, label):
+        return self._lengths[label]
 
     @property
     def train_track(self):
@@ -453,7 +456,7 @@ class Foliation(SageObject):
     def raw_to_adj(self, raw_x):
         return mod_one(2 * raw_x) if self.is_bottom_side_moebius() else raw_x
 
-    def _get_side(self, raw_point, raw_side):
+    def adj_side(self, raw_point, raw_side):
         if not self.is_bottom_side_moebius():
             return raw_side
         return TOP if raw_point < 0.5 else BOTTOM
@@ -461,182 +464,6 @@ class Foliation(SageObject):
     def adj_to_raw(self, adj_x, adj_side):
         return adj_side * Rational('1/2') + adj_x/2 \
             if self.is_bottom_side_moebius() else adj_x
-
-    class Interval(namedtuple('Interval', 'side, index')):
-        def __new__(cls, side, index, foliation):
-            self = super(Foliation.Interval, cls).__new__(cls, side, index)
-            self._foliation = foliation
-            return self
-            
-        def __repr__(self):
-            return repr((self.side, self.index))
-            
-        def as_tuple(self):
-            return (self.side, self.index)
-
-        def add_to_position(self, n):
-            return self._foliation._all_intervals[self.side][(self.index + n) 
-                    % self._foliation.num_intervals(self.side)]
-
-        def raw_endpoint(self, hdir):
-            new_hdir = LEFT if hdir == MID else hdir
-            x = self._foliation._divvalues[self.side][(self.index + new_hdir)
-                    % self._foliation.num_intervals(self.side)]
-            if hdir == MID:
-                return mod_one(x + self.length()/2)
-            else:
-                return x
-
-        def endpoint(self, hdir):
-            return self._foliation.raw_to_adj(self.raw_endpoint(hdir))
-
-        def endpoint_side(self, hdir):
-            return self._foliation._get_side(self.raw_endpoint(hdir), self.side)
-
-        def next(self):
-            return self.add_to_position(1)
-
-        def prev(self):
-            return self.add_to_position(-1)
-
-        def label(self):
-            return self._foliation.labels()[self.side][self.index]
-
-        def length(self):
-            return self._foliation._lengths[self.label()]
-
-        def is_wrapping(self):
-            return self.endpoint(LEFT) > self.endpoint(RIGHT)
-
-        def is_orienation_reversing(self):
-            return self.is_flipped() != (self.pair().side == self.side)
-
-        def is_flipped(self):
-            """
-            Decides if the interval at a certain position is 
-            flipped.
-
-            INPUT:
-
-            - ``pos`` - a tuple encoding the position. The first
-              coordinate is 0 or 1 depending on whether it is a top
-              or bottom interval. The second coordinate is the
-              index of the interval in that row.
-
-            OUTPUT:
-
-            - boolean -- True is the interval is flipped, False
-              is not
-
-            EXAMPLES::
-
-                sage: i = Involution('a a b b','c c', flips='bc');i
-                a a -b -b
-                -c -c
-                sage: i.is_flipped((0,0))
-                False
-                sage: i.is_flipped((0,1))
-                False
-                sage: i.is_flipped((0,2))
-                True
-                sage: i.is_flipped((0,3))
-                True
-                sage: i.is_flipped((1,0))
-                True
-                sage: i.is_flipped((1,1))
-                True
-
-            """
-            x = self._foliation._gen_perm[self.side][self.index]
-            if isinstance(x, tuple):
-                # self._gen_perm is a FlippedLabelledPermutationLI
-                return x[1] == -1
-            #self._gen_perm is a LabelledPermutationIET 
-            return False
-
-
-        def pair(self):
-            """
-            Returns the position of the pair of the interval at
-            a specified position.
-
-            INPUT:
-
-            - ``pos`` - a tuple encoding the position. The first
-              coordinate is 0 or 1 depending on whether it is a top
-              or bottom interval. The second coordinate is the
-              index of the interval in that row.
-
-            OUTPUT:
-
-            - tuple -- the position of the pair
-
-            EXAMPLES::
-
-                sage: i = Involution('a b a b','c c', flips = 'ab')
-                sage: i.pair((0,0))
-                (0, 2)
-                sage: i.pair((0,2))
-                (0, 0)
-                sage: i.pair((1,1))
-                (1, 0)
-
-            """
-            side, index = self._foliation._pair[(self.side, self.index)]
-            return self._foliation._all_intervals[side][index]
-
-        def which_singularity(self):
-            """
-            Returns the index of the singularity for the beginning of each
-            interval.
-
-            There is a singularity of the foliation on the leaf containing the
-            left endpoint of each interval for any suspension. There may be only
-            one singularity of all the vertices are identified, or more if not.
-            If there are $n$ singularities ($n\ge 1$), we assign 0, 1, ..., $n-1$
-            to them in some order, this is called its index. The index is 
-            therefore well-defined only up to a permutation of these values.
-
-            INPUT:
-
-            - ``pos`` - a tuple encoding the position. The first
-              coordinate is 0 or 1 depending on whether it is a top
-              or bottom interval. The second coordinate is the
-              index of the interval in that row.
-            
-v            OUTPUT:
-
-            - integer - the index of the specified singularity. 
-
-            EXAMPLES:
-
-            The following Involution has 2 singularities, one has 5 prongs, the
-            other 1 prong. The position of the 1-prong singularity is at (1,0).
-            Here is a possible output:
-
-                sage: i = Involution('a a b', 'c b c', flips = 'c')
-                sage: i.singularity_type()
-                (5, 1)
-                sage: i.which_singularity((0,0)) 
-                0
-                sage: i.which_singularity((0,1)) 
-                0
-                sage: i.which_singularity((0,2)) 
-                0
-                sage: i.which_singularity((1,0)) 
-                1
-                sage: i.which_singularity((1,1)) 
-                0
-                sage: i.which_singularity((1,2)) 
-                0
-
-            """
-            sp = self._foliation._singularity_partition
-            for i in range(len(sp)):
-                if (self.side, self.index) in sp[i]:
-                    return i
-            raise ValueError("Invalid singularity specification.")
-
 
 
 
@@ -667,7 +494,7 @@ v            OUTPUT:
             False
 
         """
-        return self._all_intervals[1][0].label() == 'JOKER'
+        return Interval(1,0).label(self) == 'JOKER'
 
 
     def flips(self):
@@ -776,8 +603,9 @@ v            OUTPUT:
         if foliation_or_surface == 'foliation':
             return len(self.flips()) == 0
         if foliation_or_surface == 'surface':
-            return all(not i.is_orienation_reversing() for side in range(2)
-                       for i in self._all_intervals[side])
+            return all(not Interval(side, pos).is_orientation_reversing(self)
+                       for side in range(2)
+                       for pos in self.num_intervals(side))
             # including the Moebius side as well
 
 
@@ -861,7 +689,6 @@ v            OUTPUT:
         return self._divvalues
 
         
-
     def with_changed_lengths(self, length_vector):
         if self.is_bottom_side_moebius():
             return Foliation(self._gen_perm_list[0], 'moebius', length_vector,
@@ -1013,8 +840,8 @@ v            OUTPUT:
             # print raw_side, raw_point
             # print to_check
             raise SaddleConnectionError()
-        return self._all_intervals[raw_side][(interval - 1) % 
-                self.num_intervals(raw_side)]
+        return Interval(raw_side, (interval - 1) % 
+                self.num_intervals(raw_side))
 
 
     def apply_iet(self, adj_point, adj_side, containing_interval):
@@ -1060,14 +887,14 @@ v            OUTPUT:
 
         """
         raw_point = self.adj_to_raw(adj_point, adj_side)
-        new_int = containing_interval.pair()
-        diff = raw_point - containing_interval.raw_endpoint(LEFT)
-        if not containing_interval.is_flipped():
-            raw_x = mod_one(new_int.raw_endpoint(LEFT) + diff)
+        new_int = containing_interval.pair(self)
+        diff = raw_point - containing_interval.raw_endpoint(LEFT, self)
+        if not containing_interval.is_flipped(self):
+            raw_x = mod_one(new_int.raw_endpoint(LEFT, self) + diff)
         else:
-            raw_x = mod_one(new_int.raw_endpoint(RIGHT) - diff)
+            raw_x = mod_one(new_int.raw_endpoint(RIGHT, self) - diff)
 
-        return (self._get_side(raw_x, new_int.side), self.raw_to_adj(raw_x), new_int)
+        return (self.adj_side(raw_x, new_int.side), self.raw_to_adj(raw_x), new_int)
 
     # def point_int_on_other_side(self, point, side):
     #     if self.is_bottom_side_moebius():
@@ -1081,22 +908,31 @@ v            OUTPUT:
 
     def rotated(self, n):
         from separatrix import Separatrix
-        from transition_map import new_foliation, get_tt_map
+        from transition_map import new_foliation
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
-        i = self._all_intervals[0][0]
-        i = i.add_to_position(-n)
-        return new_foliation(separatrices, i.endpoint(LEFT), i.endpoint_side(LEFT),
+        i = Interval(0,0).add_to_position(-n, self)
+        return new_foliation(separatrices, i.endpoint(LEFT, self),
+                             i.endpoint_side(LEFT, self),
                              is_one_sided = self.is_bottom_side_moebius())
 
     def reversed(self):
         from separatrix import Separatrix
-        from transition_map import new_foliation, get_tt_map
+        from transition_map import new_foliation
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
         return new_foliation(separatrices, 0, TOP, direction = 'left',
                              is_one_sided = self.is_bottom_side_moebius())
                                  
     
-
+    def flip_over(self):
+        if self.is_bottom_side_moebius():
+            raise ValueError("Can't flip over a foliation around a "
+                             "one-sided curve.")
+        from separatrix import Separatrix
+        from transition_map import new_foliation
+        separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
+        return new_foliation(separatrices, 0, BOTTOM, direction = 'right',
+                             is_one_sided = False)
+        
 
     def double_cover(self, foliation_or_surface):
         """
@@ -1192,8 +1028,8 @@ v            OUTPUT:
             separatrices += Separatrix.get_all(self, number_of_flips_to_stop=1)
             # removing removable singularities
             separatrices = [s for s in separatrices
-                            if s.first_interval(0).prev() !=
-                            s.first_interval(0).pair()]
+                            if s.first_interval(0).prev(self) !=
+                            s.first_interval(0).pair(self)]
 
         elif foliation_or_surface == 'surface':
             if not self.is_bottom_side_moebius():

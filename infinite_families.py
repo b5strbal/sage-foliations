@@ -1,9 +1,10 @@
 from foliation import Foliation
-from transverse_curve import tt_map_from_codings, Coding
+from transverse_curve import Coding
+from search import tt_map_from_codings
 from sage.rings.integer_ring import ZZ
 from sage.rings.polynomial.polynomial_ring_constructor import \
     PolynomialRing
-
+from pseudo_anosov import PseudoAnosov
 # charpoly: x^6-x^5-kx^3-x-1
 f = Foliation('1 2 3 4 5 6','5 2 1 4 3 6',[0.170886909342, 0.189075941817, 0.108600690819, 0.0879378482553, 0.0369647624731, 0.406533847294], twist = 0.0914086480774)
 
@@ -39,7 +40,12 @@ def family_A_factor(n, k, field = RDF):
     poly = R([-1] + [-k] * (n-1) + [1])
     return max([abs(x[0]) for x in poly.roots(field)])
     
-
+# def family_B_factor(n, k, field = RDF):
+#     R = PolynomialRing(ZZ, 't')
+#     poly = R([1] + [-k+1] * (n-2) + [-k-1,1])
+#     print poly
+#     return max([abs(x[0]) for x in poly.roots(field)])
+    
 
 
 def family_A_foliation_RP2(k):
@@ -87,22 +93,33 @@ def family_A_foliation(n, k, is_orientable):
         top = sorted(2 * range(1, n + 1))
         return Foliation(top, 'moebius', lengths)
 
+# def family_B_foliation_nonor(n, k):
+#     sf = family_B_factor(n, k)
+#     lengths = [1/sf**i for i in range(1,n)]
+#     lengths.append(1-sum(lengths))
+#     top = sorted(2 * range(1, n + 1))
+#     return Foliation(top, 'moebius', lengths)
 
 
+# def orientableAY_tt_map():
+#     fol = Foliation.orientable_arnoux_yoccoz(3)
+#     coding_list = [Coding(1,4,0,0,0),Coding(1,1,0,0,0),False,5]
+#     return tt_map_from_codings(fol, coding_list)
 
-def orientableAY_tt_map():
-    fol = Foliation.orientable_arnoux_yoccoz(3)
-    coding_list = [Coding(1,4,0,0,0),Coding(1,1,0,0,0),False,5]
-    return tt_map_from_codings(fol, coding_list)
 
-
-def family_A_tt_map(n, k, is_orientable):
+def family_A_PA(n, k, is_orientable):
     fol = family_A_foliation(n, k, is_orientable)
     if not is_orientable:
-        coding_list = [Coding(0,0,0,0,0),True,-1]
+        coding_list = [Coding(0,0,1,0,0),False,-1]
     else:
         b = 2*n-4 if k > 1 else 1
         coding_list = [Coding(0,0,0,0,0),Coding(1,b,0,0,0),False,-1]
 
-    return tt_map_from_codings(fol, coding_list)
+    tt_map = tt_map_from_codings(fol, coding_list)
+    # return (tt_map.domain, tt_map.codomain)
+    return PseudoAnosov(tt_map)
 
+# def family_B_tt_map(n, k):
+#     fol = family_B_foliation_nonor(n, k)
+#     coding_list = [Coding(0,0,1,0,0),False,1]
+#     return tt_map_from_codings(fol, coding_list)

@@ -1,8 +1,10 @@
-from train_track import TrainTrack
+from train_track import TrainTrackPath
+from train_track_map import TrainTrackMap
 from collections import namedtuple
 from foliation import Foliation, SaddleConnectionError
 from mymath import mod_one
 from constants import *
+from interval import Interval
 
 def new_foliation(separatrices, adj_starting_point, adj_starting_side,
                       is_one_sided = False, direction = 'right',
@@ -176,26 +178,26 @@ def get_tt_map(old_fol, new_fol, path_entries):
             
             # reversing if necessary
             if long_end[0] == END:
-                long_path_to_append = TrainTrack.Path(long_path_to_append).reversed()
+                long_path_to_append = TrainTrackPath(long_path_to_append).reversed()
                 
             # cutting off the first edge
             long_path_to_append = long_path_to_append[1:]
 
         v0 = vertex_map[interval] = tails[START][LEFT][-1].end()
-        v1 = vertex_map[interval.pair()] = tails[END][LEFT][0].start()
-        edge_map[tt_new.get_edge_from(interval, 'pair')] = TrainTrack.Path(center)
-        edge_map[tt_new.get_edge_from(interval, 'center')] = TrainTrack.Path(tails[START][LEFT]).reversed()
-        b = tails[END][RIGHT if interval.is_flipped() else LEFT]
-        edge_map[tt_new.get_edge_from(interval.pair(), 'center')] = TrainTrack.Path(b)
+        v1 = vertex_map[interval.pair(new_fol)] = tails[END][LEFT][0].start()
+        edge_map[tt_new.get_edge_from(interval, 'pair')] = TrainTrackPath(center)
+        edge_map[tt_new.get_edge_from(interval, 'center')] = TrainTrackPath(tails[START][LEFT]).reversed()
+        b = tails[END][RIGHT if interval.is_flipped(new_fol) else LEFT]
+        edge_map[tt_new.get_edge_from(interval.pair(new_fol), 'center')] = TrainTrackPath(b)
 
     # print long_path_to_append
     # print to_be_corrected
     # print edge_map
     for (side, pos) in to_be_corrected:
-        interval = new_fol.interval(side, pos)
+        interval = Interval(side, pos)
         edge_map[tt_new.get_edge_from(interval, 'center')].extend(long_path_to_append)
 
-    return TrainTrack.Map(domain = tt_new,
+    return TrainTrackMap(domain = tt_new,
                           codomain = tt_old,
                           vertex_map = vertex_map,
                           edge_map = edge_map)
@@ -225,7 +227,8 @@ PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 
 def get_pair_and_path(separatrices, side, i, end, 
                        lift_type, direction, ending_point, do_we_cut):
-    tt = separatrices[0][0].foliation.train_track
+    fol = separatrices[0][0].foliation 
+    tt = fol.train_track
     s0 = separatrices[side][(i + end) % len(separatrices[side])]
 
             
@@ -246,14 +249,14 @@ def get_pair_and_path(separatrices, side, i, end,
     
     interval = path[-1].end()
     # adding connecting interval to train track path
-    interval2 = interval.pair()
+    interval2 = interval.pair(fol)
     bridge = tt.get_oriented_edge(interval, interval2, 'pair')
     path.append(bridge)
     interval = interval2
-    if interval.is_flipped():
+    if interval.is_flipped(fol):
         end = (end + 1) % 2
     if end == 1:
-        interval = interval.next()
+        interval = interval.next(fol)
     is_flipped_so_far = start_end != end 
     new_side, new_i = matching_sep_index(separatrices,
                                               interval,

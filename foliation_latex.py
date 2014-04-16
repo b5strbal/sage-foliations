@@ -105,6 +105,7 @@ class FoliationLatex(SageObject):
         color = 'separatrixcolor' if hshift == None else 'curvecolor'
         opts = 'separatrix opts' if hshift == None else 'curve opts'
 
+        fol = self._foliation
         s = ''
         for i in range(separatrix.num_intersections() - 1):
             x = separatrix.get_intersection(i)
@@ -112,7 +113,7 @@ class FoliationLatex(SageObject):
             s += '\\draw[color={col}, {opt}] ({x},-0.5) --'\
                  ' ({x},0.5);\n'.format(x=x, opt = opts,
                                         col = color)
-            if separatrix.get_tt_edge(2 * i + 1).start().is_flipped():
+            if separatrix.get_tt_edge(2 * i + 1).start().is_flipped(fol):
                 hshift = (hshift + 1) % 2 if hshift != None else None
 
         # # the following correction is necessary to handle the difference
@@ -149,9 +150,10 @@ class FoliationLatex(SageObject):
 
 
     def _tikz_of_train_track_edge(self, edge):
+        fol = self._foliation
         s = ''
-        m = [edge[i].endpoint(MID) for i in [0,1]]
-        y = [get_y(edge[i].endpoint_side(MID))/2 for i in [0,1]]
+        m = [edge[i].endpoint(MID, fol) for i in [0,1]]
+        y = [get_y(edge[i].endpoint_side(MID, fol))/2 for i in [0,1]]
         arrows = ['>','<']
         if edge[2] == 'pair':
             return "".join(['\\fill ({x},{y1}) circle (0.005);\n'\
@@ -160,36 +162,35 @@ class FoliationLatex(SageObject):
                     y1 = y[i], y2 =2 * y[i],
                     arr = arrows[i]) for i in [0,1]])
                             
-        clip = edge[0].is_wrapping() or edge[1].is_wrapping()
+        clip = edge[START].is_wrapping(fol) or edge[END].is_wrapping(fol)
         if clip:
             s += '\\begin{scope}\n'\
                  '\\clip (0,-0.5) rectangle (1,0.5);\n'
         
-        shift = 0.5 if self._foliation.is_bottom_side_moebius() else 0.0
+        shift = 0.5 if fol.is_bottom_side_moebius() else 0.0
 
-        overlap_length = min(mod_one(edge[1].raw_endpoint(1) + shift -
-                                     edge[0].raw_endpoint(0)),
-                             mod_one(edge[0].raw_endpoint(1) -
-                                     edge[0].raw_endpoint(0)))
-        # right_endpoint = mod_one(edge[0].endpoint(0) + overlap_length)
+        overlap_length = min(mod_one(edge[END].raw_endpoint(RIGHT, fol) + shift -
+                                     edge[START].raw_endpoint(LEFT, fol)),
+                             mod_one(edge[START].raw_endpoint(RIGHT, fol) -
+                                     edge[START].raw_endpoint(LEFT, fol)))
 
         x = []
-        fac = 1 if self._foliation.is_bottom_side_moebius() else 0.5
-        x.append(m[0] - edge[0].length()*fac + overlap_length*fac)
-        x.append(m[1] - edge[1].length()*fac +
-                 2*mod_one(edge[0].raw_endpoint(0) + shift -
-                         edge[1].raw_endpoint(0))*fac + overlap_length*fac)
+        fac = 1 if fol.is_bottom_side_moebius() else 0.5
+        x.append(m[0] - edge[START].length(fol)*fac + overlap_length*fac)
+        x.append(m[1] - edge[END].length(fol)*fac +
+                 2*mod_one(edge[START].raw_endpoint(LEFT, fol) + shift -
+                           edge[END].raw_endpoint(LEFT, fol))*fac + overlap_length*fac)
                              
             
         transformations = [{''}, {''}]        
         for i in range(2):
             if x[i] < 0:
-                if self._foliation.is_bottom_side_moebius():
+                if fol.is_bottom_side_moebius():
                     transformations[i].add('xshift=1cm,yscale=-1')                     
                 else:
                     transformations[i].add('xshift=1cm')
             elif x[i] > 1:
-                if self._foliation.is_bottom_side_moebius():
+                if fol.is_bottom_side_moebius():
                     transformations[i].add('xshift=-1cm,yscale=-1')                     
                 else:
                     transformations[i].add('xshift=-1cm')
@@ -256,31 +257,31 @@ class FoliationLatex(SageObject):
         labels = ''
 
         fol = self._foliation
-        for interval in self._foliation.intervals():
+        for interval in fol.intervals():
 
             begin_percent = color_strength
             end_percent = 0
             middle_percent = None
 
-            signed_label = str(interval.label())
-            if interval.is_flipped():
+            signed_label = str(interval.label(fol))
+            if interval.is_flipped(fol):
                 signed_label = '-' + signed_label
-                if interval > interval.pair():
+                if interval > interval.pair(fol):
                     begin_percent, end_percent = end_percent, begin_percent
 
-            x = [interval.endpoint(i) for i in [LEFT, RIGHT]]
-            midx = interval.endpoint(MID)
-            y = [get_y(interval.endpoint_side(i)) for i in [LEFT, RIGHT]]
+            x = [interval.endpoint(i, fol) for i in [LEFT, RIGHT]]
+            midx = interval.endpoint(MID, fol)
+            y = [get_y(interval.endpoint_side(i, fol)) for i in [LEFT, RIGHT]]
             color = _tikzcolor(self._foliation.index_of_label(
-                interval.label()))
-            if x[1] == 0:
-                x[1] = 1
+                interval.label(fol)))
+            if x[RIGHT] == 0:
+                x[RIGHT] = 1
                 if fol.is_bottom_side_moebius():
-                    y[1] = -0.5
+                    y[RIGHT] = -0.5
 
 
             temp_lines = '\\draw ({x0},0) -- ({x0},{y0});\n'
-            if x[0] < x[1]:
+            if x[LEFT] < x[RIGHT]:
                 temp_lines += '\\draw[dashed] ({x0},{y0}) -- ({x1},{y1});\n'
                 temp_fillings = '\\shade[left color = {col}!{bp}!white, '\
                         'right color = {col}!{ep}!white] ({x0},0) rectangle '\
@@ -288,7 +289,7 @@ class FoliationLatex(SageObject):
             else:
                 temp_lines += '\\draw[dashed] ({x0},{y0}) -- (1,{y0});\n'
                 temp_lines += '\\draw[dashed] (0,-0.5) -- ({x1},-0.5);\n'
-                middle_percent = color_strength * (x[1]) / (1 + x[1] - x[0])
+                middle_percent = color_strength * (x[RIGHT]) / (1 + x[1] - x[0])
                 if begin_percent == 0:
                     middle_percent = color_strength - middle_percent
 
@@ -306,10 +307,10 @@ class FoliationLatex(SageObject):
                                              ep=end_percent,
                                              mp=middle_percent)
 
-            sing_color = _tikzcolor(interval.which_singularity())
+            sing_color = _tikzcolor(interval.which_singularity(fol))
             singularities += '\\filldraw[fill={col}, draw = black] ({x0},{y0}) '\
                     'circle (0.005);\n'.format(x0=x[0],y0=y[0], col = sing_color)
-            midy = get_y(interval.endpoint_side(MID))
+            midy = get_y(interval.endpoint_side(MID, fol))
             above_or_below = 'above' if midy == 0.5 else 'below'
 
             if length_labelling:
@@ -317,7 +318,8 @@ class FoliationLatex(SageObject):
                         format(m=midx, pos=above_or_below, label=signed_label)
             if interval_labelling:
                 labels += '\\node at ({m},{y}) [{pos}] {{{length}}};\n'.\
-                        format(m=midx, y=midy, pos=above_or_below, length=round(interval.length(), 4))
+                        format(m=midx, y=midy, pos=above_or_below,
+                               length=round(interval.length(fol), 4))
 
         lines += '\\draw (1,0) -- (1,{y});\n'\
                 '\\draw[very thick] (0,0) -- (1,0);\n'.format(y=-0.5 if fol.is_bottom_side_moebius()
