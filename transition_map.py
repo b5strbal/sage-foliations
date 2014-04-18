@@ -7,8 +7,9 @@ from constants import *
 from interval import Interval
 
 def new_foliation(separatrices, adj_starting_point, adj_starting_side,
-                      is_one_sided = False, direction = 'right',
-                      adj_ending_point = None, lift_type = None):
+                  is_one_sided = False, hdir = RIGHT,
+                  adj_ending_point = None, lift_type = None,
+                  transformation_coding = None):
 
 
     if adj_ending_point == None:
@@ -17,7 +18,7 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
     else:
         arc_length = mod_one(adj_ending_point - adj_starting_point)
 
-    start_of_new_fol = adj_starting_point if direction == 'right' else \
+    start_of_new_fol = adj_starting_point if hdir == RIGHT else \
                        adj_ending_point
 
     if lift_type == 'surface' and is_one_sided:
@@ -25,10 +26,10 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
     else:
         separatrices = sorted_separatrices(separatrices, start_of_new_fol,
                                            adj_starting_side, is_one_sided,
-                                           direction)
+                                           hdir)
 
     # print separatrices
-    # print direction, adj_starting_point, adj_ending_point, adj_starting_side
+    # print hdir, adj_starting_point, adj_ending_point, adj_starting_side
 
 
     flips = set()
@@ -44,7 +45,7 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
     else:
         twist = mod_one(separatrices[1][0].endpoint -
                         separatrices[0][0].endpoint)
-        if direction == 'left':
+        if hdir == LEFT:
             twist = 1 - twist
 
     # need only one path for each interval if it is a lift, becuase
@@ -62,8 +63,8 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
                         get_pair_and_path(separatrices,
                                           side, i, end,
                                           lift_type,
-                                          direction,
-                                          adj_ending_point if direction == 'right' else
+                                          hdir,
+                                          adj_ending_point if hdir == RIGHT else
                                           adj_starting_point,
                                           do_we_cut = arc_length < 1)
                 # print "PE: ", path_entries[(side,i,end)]
@@ -76,12 +77,12 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
 
             s1 = separatrices[side][i]
             s2 = separatrices[side][(i+1)%len(separatrices[side])]
-            if direction == 'left':
+            if hdir == LEFT:
                 s1, s2 = s2, s1
             lengths[label] = mod_one(s2.endpoint - s1.endpoint)
             if i == len(separatrices[side]) - 1 or \
-               side_of_sep(s1, adj_starting_side, adj_starting_point, direction) !=\
-               side_of_sep(s2, adj_starting_side, adj_starting_point, direction):
+               side_of_sep(s1, adj_starting_side, adj_starting_point, hdir) !=\
+               side_of_sep(s2, adj_starting_side, adj_starting_point, hdir):
                 # the first condition is for the case when the transverse curve
                 # is orientable, the second is for non-orientable
                 lengths[label] -= 1 - arc_length
@@ -112,13 +113,14 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
         # exit
     tt_map = None if lift_type != None else get_tt_map(old_fol,
                                                        new_fol,
-                                                       path_entries)
+                                                       path_entries,
+                                                       transformation_coding)
                                                        
     return (new_fol, tt_map)
 
 
 
-def get_tt_map(old_fol, new_fol, path_entries):
+def get_tt_map(old_fol, new_fol, path_entries, transformation_coding):
     tt_new = new_fol.train_track
     tt_old = old_fol.train_track
     vertex_map = {}
@@ -198,9 +200,10 @@ def get_tt_map(old_fol, new_fol, path_entries):
         edge_map[tt_new.get_edge_from(interval, 'center')].extend(long_path_to_append)
 
     return TrainTrackMap(domain = tt_new,
-                          codomain = tt_old,
-                          vertex_map = vertex_map,
-                          edge_map = edge_map)
+                         codomain = tt_old,
+                         vertex_map = vertex_map,
+                         edge_map = edge_map,
+                         coding_list = [transformation_coding])
 
 
 def break_apart(paths, long_end = None):
@@ -226,7 +229,7 @@ def break_apart(paths, long_end = None):
 PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 
 def get_pair_and_path(separatrices, side, i, end, 
-                       lift_type, direction, ending_point, do_we_cut):
+                       lift_type, hdir, ending_point, do_we_cut):
     fol = separatrices[0][0].foliation 
     tt = fol.train_track
     s0 = separatrices[side][(i + end) % len(separatrices[side])]
@@ -235,7 +238,7 @@ def get_pair_and_path(separatrices, side, i, end,
     # print separatrices
     # print side, i, end
 
-    if direction == 'left':
+    if hdir == LEFT:
         end = (end + 1) % 2
     start_end = end
     if s0.is_flipped():
@@ -269,7 +272,7 @@ def get_pair_and_path(separatrices, side, i, end,
     
     if s1.is_flipped():
         end = (end + 1) % 2
-    if direction == 'left':
+    if hdir == LEFT:
         end = (end + 1) % 2
     if end == 1:
         new_i = (new_i - 1) % len(separatrices[new_side])
@@ -280,7 +283,7 @@ def get_pair_and_path(separatrices, side, i, end,
 
 
     # converting second separatrix to train track path
-    # path.extend(s1.tt_path(end if direction == 'right' else (end + 1)%2))
+    # path.extend(s1.tt_path(end if hdir == RIGHT else (end + 1)%2))
 
 
     # we need to collect intersections for the special case when we need to
@@ -349,9 +352,9 @@ def matching_sep_index(separatrices, interval, lift_type,
 
 
 def sorted_separatrices(separatrices, start_of_new_fol, starting_side,
-                        is_one_sided, direction = 'right'):
+                        is_one_sided, hdir = RIGHT):
     def distance(sep):
-        if direction == 'right':
+        if hdir == RIGHT:
             return mod_one(sep.endpoint - start_of_new_fol)
         else:
             return mod_one(start_of_new_fol - sep.endpoint)
@@ -359,7 +362,7 @@ def sorted_separatrices(separatrices, start_of_new_fol, starting_side,
 
     seps = [sorted([s for s in separatrices if 
                     side_of_sep(s, starting_side, 
-                                start_of_new_fol, direction) == side],
+                                start_of_new_fol, hdir) == side],
                    key = distance)
             for side in [TOP,BOTTOM]]
 
@@ -376,15 +379,15 @@ def sorted_separatrices(separatrices, start_of_new_fol, starting_side,
 
 
 
-def side_of_sep(sep, starting_side, start_of_new_fol, direction):
+def side_of_sep(sep, starting_side, start_of_new_fol, hdir):
     fol = sep.foliation        
     if not fol.is_bottom_side_moebius():
         return TOP if sep.end_side() == starting_side else BOTTOM
     ep = sep.endpoint
-    on_start_side = direction == 'right' and start_of_new_fol <= ep or\
-                    direction == 'left' and start_of_new_fol >= ep
+    on_start_side = hdir == RIGHT and start_of_new_fol <= ep or\
+                    hdir == LEFT and start_of_new_fol >= ep
     on_same_side = starting_side == sep.end_side()
-    # print sep, on_start_side, on_same_side, direction, start_of_new_fol, ep
+    # print sep, on_start_side, on_same_side, hdir, start_of_new_fol, ep
     return TOP if on_same_side == on_start_side else BOTTOM
 
 def double_separatrices(separatrices):

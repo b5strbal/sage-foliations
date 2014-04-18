@@ -1,12 +1,15 @@
 from foliation import Foliation
 from transverse_curve import Coding
-from search import tt_map_from_codings
+from train_track_map import tt_map_from_codings
 from sage.rings.integer_ring import ZZ
+from sage.rings.real_double import RDF
+
 from sage.rings.polynomial.polynomial_ring_constructor import \
     PolynomialRing
 from pseudo_anosov import PseudoAnosov
+from constants import *
 # charpoly: x^6-x^5-kx^3-x-1
-f = Foliation('1 2 3 4 5 6','5 2 1 4 3 6',[0.170886909342, 0.189075941817, 0.108600690819, 0.0879378482553, 0.0369647624731, 0.406533847294], twist = 0.0914086480774)
+# f = Foliation('1 2 3 4 5 6','5 2 1 4 3 6',[0.170886909342, 0.189075941817, 0.108600690819, 0.0879378482553, 0.0369647624731, 0.406533847294], twist = 0.0914086480774)
 
 
 def family_A_factor(n, k, field = RDF):
@@ -107,15 +110,20 @@ def family_A_foliation(n, k, is_orientable):
 #     return tt_map_from_codings(fol, coding_list)
 
 
+from transverse_curve import RestrictionCoding, Coding
+from foliation import SymmetryCoding
+from interval import Interval
+
 def family_A_PA(n, k, is_orientable):
     fol = family_A_foliation(n, k, is_orientable)
     if not is_orientable:
-        coding_list = [Coding(0,0,1,0,0),False,-1]
+        coding_list = [RestrictionCoding(fol, Coding(0,0,1,0,0)),
+                       SymmetryCoding(Interval(0,1), RIGHT)]
     else:
         b = 2*n-4 if k > 1 else 1
         coding_list = [Coding(0,0,0,0,0),Coding(1,b,0,0,0),False,-1]
 
-    tt_map = tt_map_from_codings(fol, coding_list)
+    tt_map = tt_map_from_codings(fol.train_track, coding_list)
     # return (tt_map.domain, tt_map.codomain)
     return PseudoAnosov(tt_map)
 

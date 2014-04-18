@@ -65,37 +65,73 @@ class TrainTrack(SageObject):
         self._coboundary_map = [None, None]
         self._tree_edge_indices = None
         
-        degrees = [0] * len(self._index_to_vertex)
+        self._degrees = [0] * len(self._index_to_vertex)
         for edge in self.edges():
             for i in [0,1]:
-                degrees[self._vertex_to_index[edge[i]]] += 1
+                self._degrees[self._vertex_to_index[edge[i]]] += 1
                         
-        self._degree_product = prod(degrees)
+        self._degree_product = prod(self._degrees)
 
         n = foliation.num_intervals(TOP)
-        d1, d2 = degrees[:n], degrees[n:]
+        d1, d2 = self._degrees[:n], self._degrees[n:]
         self._checksum = sum([abs(d[i]-d[(i+1)%len(d)]) for d in [d1, d2]
              for i in xrange(len(d))])
+
+        self._invariants = (self._degree_product, self._checksum, n)
 
     def __eq__(self, other):
         # print self._index_to_edge
         # print other._index_to_edge
         # print self._index_to_edge == other._index_to_edge
         # print '\n'
-        if self._index_to_edge != other._index_to_edge:
-            return False
+        
+        return isinstance(other, TrainTrack) and \
+            self.invariants() == other.invariants() and \
+            self._index_to_edge == other._index_to_edge and \
+            self.sample_fol().permutation() == other.sample_fol().permutation()
+
         # The flips of the sample foliation should be the same as well,
         # otherwise the underlying surfaces might not be homeomorphic.
-        return self.sample_fol().permutation() == other.sample_fol().permutation()
+
+
+    def _repr_(self):
+        s = "Train track with degrees "
+        s += repr(self._degrees) + " and invariants "
+        s += repr(self.invariants())
+        return s
+
+
+    def identity_map(self):
+        from train_track_map import TrainTrackMap
+        return TrainTrackMap(self, self,
+                             {v:v for v in self.vertices()},
+                             {e:TrainTrackPath.from_edge(e) for e in self.edges()},
+                             coding_list = [])
+
+
+    def transform(self, interval, hdir):
+        return self.sample_fol().transform(interval, hdir)[1]
+
+    # def rotation_map(self, n):
+    #     return self.sample_fol().rotated(n)[1]
+
+    # def reversing_map(self):
+    #     return self.sample_fol().reversed()[1]
+        
+    # def flip_over_map(self):
+    #     return self.sample_fol().flip_over()[1]
+
+    def invariants(self):
+        return self._invariants
 
     def sample_fol(self):
         return self._sample_fol
 
-    def degree_product(self):
-        return self._degree_product
+    # def degree_product(self):
+    #     return self._degree_product
 
-    def checksum(self):
-        return self._checksum
+    # def checksum(self):
+    #     return self._checksum
 
     def vertices(self):
         return self._index_to_vertex
@@ -308,6 +344,29 @@ class TrainTrack(SageObject):
         return FoliationLatex(self.sample_fol()).tikz_picture(
             train_tracks = [self])
         
+
+    def get_symmetries_from(self, from_tt = None):
+        self_map = (from_tt == None)
+        if self_map:
+            if hasattr(self, '_self_symmetries'):
+                return self._self_symmetries
+            from_tt = self
+
+            
+        if from_tt.invariants() != self.invariants():
+            return []
+
+        symmetries = []
+        for interval in self.sample_fol().intervals():
+            for hdir in [LEFT, RIGHT]:
+                tt_map = self.transform(interval, hdir)
+                if tt_map.domain == from_tt:
+                    symmetries.append(tt_map)
+        if self_map:
+            self._self_symmetries = symmetries
+        return symmetries
+
+
         
 class TrainTrackPath(list):
     def reversed(self):

@@ -68,7 +68,7 @@ class TransverseCurve(SageObject):
             if self._arc.contains(x):
                 raise RestrictionError("The curve is self-intersecting")
 
-        self._direction = 'right' if openness[0] == 'closed' else 'left'
+        self._direction = RIGHT if openness[0] == 'closed' else LEFT
         self._coding = coding
         # print coding, self._direction, self._arc
         # print '\n'
@@ -114,11 +114,17 @@ class TransverseCurve(SageObject):
 
     def new_foliation(self):
         from transition_map import new_foliation
-        adj_starting_side = self._sep[0].end_side() if self._direction == 'right' \
+        fol = self._foliation
+        adj_starting_side = self._sep[0].end_side() if self._direction == RIGHT \
                        else self._sep[1].end_side()
         return new_foliation(self._get_separatrices(), self._sep[0].endpoint,
                              adj_starting_side,
                              is_one_sided = self.is_one_sided(),
-                             direction = self._direction,
-                             adj_ending_point = self._sep[1].endpoint)
+                             hdir = self._direction,
+                             adj_ending_point = self._sep[1].endpoint,
+                             transformation_coding = RestrictionCoding(fol, self._coding))
+
+
+RestrictionCoding = namedtuple("RestrictionCoding", "foliation, coding")
+
 

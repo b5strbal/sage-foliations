@@ -1,19 +1,19 @@
 from collections import namedtuple
 from transverse_curve import Coding, TransverseCurve
 
-def get_codings(foliation):
-    codings = []
-    for interval in foliation.intervals():
-        if not interval.is_flipped(foliation):
-            codings.append(Coding(interval.side, interval.index,
-                                  0, 0, 0))
-        else:
-            codings.append(Coding(interval.side, interval.index,
-                                  0, 0, 1))
-            codings.append(Coding(interval.side, interval.index,
-                                  1, 0, 1))
+# def get_codings(foliation):
+#     codings = []
+#     for interval in foliation.intervals():
+#         if not interval.is_flipped(foliation):
+#             codings.append(Coding(interval.side, interval.index,
+#                                   0, 0, 0))
+#         else:
+#             codings.append(Coding(interval.side, interval.index,
+#                                   0, 0, 1))
+#             codings.append(Coding(interval.side, interval.index,
+#                                   1, 0, 1))
                                 
-    return codings
+#     return codings
 
 # PseudoAnosov = namedtuple("PseudoAnosov", "foliation, coding, charpoly, eigenvalue,"
 #                           "tt_map") 
@@ -44,33 +44,6 @@ def get_codings(foliation):
 #     else:
 #         print "Small matrix not square."
     
-def tt_map_from_codings(foliation, coding_list):
-    from train_track_map import TrainTrackMap
-    tt_map_so_far = TrainTrackMap.identity(foliation.train_track)
-    for coding in coding_list:
-        # the last two elements of the list are the reversing and the rotation
-        if not isinstance(coding, Coding):
-            break
-        tc = TransverseCurve(foliation, coding)
-        foliation, tt_map = tc.new_foliation()
-        tt_map_so_far = tt_map_so_far * tt_map
-        # print_charpoly(tt_map_so_far)
-        # print tt_map_so_far.domain.basis_of_cohomology(False), '\n'
-        
-    if coding_list[-2]: # reversed
-        foliation, tt_map = foliation.reversed()
-        tt_map_so_far = tt_map_so_far * tt_map
-        # print_charpoly(tt_map_so_far)
-        # print tt_map_so_far.domain.basis_of_cohomology(False), '\n'
-    
-        
-
-    foliation, tt_map = foliation.rotated(coding_list[-1])
-    tt_map_so_far = tt_map_so_far * tt_map
-    # print tt_map_so_far.domain.basis_of_cohomology(False), '\n'
-    # print_charpoly(tt_map_so_far)
-    # print '\n'
-    return tt_map_so_far
 
 # def create_pseudo_anosov(pa_cand):
 #     try:

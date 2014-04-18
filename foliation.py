@@ -6,52 +6,12 @@ from mymath import mod_one
 from interval import Interval
 from constants import *
 from myexceptions import SaddleConnectionError
-
-
-# def basis_vector(n, k):
-#     """
-#     Returns a standard basis vector of a vector space.
-
-#     INPUT:
-
-#     - ``n`` - positive integer, the dimension of the vector space
-
-#     - ``k`` - 0 <= k < n, the index of the only coordinate which
-#       is 1.
-
-#     OUTPUT:
-
-#     - list - the basis vector in as a list
-
-#     EXAMPLES::
-
-#         sage: from sage.dynamics.foliations.foliation import basis_vector
-#         sage: basis_vector(5, 1)
-#         [0, 1, 0, 0, 0]
-#         sage: basis_vector(7, 6)
-#         [0, 0, 0, 0, 0, 0, 1]
-#     """
-#     l = [0] * n
-#     l[k] = 1
-#     return l
-
-
-
-
-
-
-
-
-
-from sage.rings.real_double import RDF
-
-
-
-
-
-
-
 from sage.rings.rational import Rational
+from collections import namedtuple
+
+SymmetryCoding = namedtuple("SymmetryCoding", "interval, hdir")
+
+
 class Foliation(SageObject):
     """
     A measured foliation on a surface of finite type.
@@ -255,10 +215,12 @@ class Foliation(SageObject):
         """
         self._tt = None # Train Track is created only when first used.
 
+        self._is_bottom_side_moebius = False
         if bottom_letters == 'moebius': # bottom side is Moebius
             bottom_letters = 'JOKER JOKER'
+            self._is_bottom_side_moebius = True
         self._init_gen_perm(top_letters, bottom_letters, flips)
-
+        
         
         from bisect import bisect_left
         if not self.is_bottom_side_moebius():
@@ -287,17 +249,27 @@ class Foliation(SageObject):
         totals = [sum(interval.length(self) for interval in 
                       self._all_intervals[side]) for side in [0,1]]
 
-        if abs(totals[0] - totals[1]) > epsilon:
-            raise ValueError('The total length on the top and '
-                    'bottom are inconsistent.')
         
         #adjusting lengths in case they 
-        #differ slightly on top/bottom
+        #differ on top/bottom
         for interval in self._all_intervals[0]:
             if interval.pair(self).side == interval.side:
                 self._lengths[interval.label(self)] += \
                         (totals[1] - totals[0])/2
                 break
+
+        totals = [sum(interval.length(self) for interval in 
+                      self._all_intervals[side]) for side in [0,1]]
+
+        if abs(totals[0] - totals[1]) > epsilon:
+            print lengths
+            print self._lengths
+            print totals[0], totals[1], abs(totals[0] - totals[1])
+            print top_letters
+            print bottom_letters
+            raise ValueError('The total length on the top and '
+                    'bottom are inconsistent.')
+
 
         for label in self._lengths:
             self._lengths[label] /= totals[1]
@@ -331,7 +303,6 @@ class Foliation(SageObject):
                     = self._lengths[label]
         self._length_twist_vector = vector(self._length_twist_vector)
 
-        self._init_singularity_partition()
 
     def _init_singularity_partition(self):
         # initializing self._singularity_partition
@@ -367,6 +338,8 @@ class Foliation(SageObject):
         
     @property
     def paths_around_singularities(self):
+        if not hasattr(self, '_paths_around_singularities'):
+            self._init_singularity_partition()
         return self._paths_around_singularities
 
     def _init_gen_perm(self, top_letters, bottom_letters, flips):
@@ -406,7 +379,7 @@ class Foliation(SageObject):
     #     return self._all_intervals[side][index]
 
     def num_intervals(self, side):
-        return len(self._gen_perm[side])
+        return len(self._gen_perm_list[side])
 
     def labels(self):
         return self._gen_perm_list
@@ -494,7 +467,7 @@ class Foliation(SageObject):
             False
 
         """
-        return Interval(1,0).label(self) == 'JOKER'
+        return self._is_bottom_side_moebius
 
 
     def flips(self):
@@ -638,6 +611,9 @@ class Foliation(SageObject):
             True
 
         """
+        if not hasattr(self, '_singularity_partition'):
+            self._init_singularity_partition()
+
         return list(self._singularity_partition)
 
          
@@ -689,13 +665,20 @@ class Foliation(SageObject):
         return self._divvalues
 
         
-    def with_changed_lengths(self, length_vector):
+    def with_changed_lengths(self, length_vector = None):
+        import random
+        if length_vector == None: # randomize lengths
+            n = len(self.alphabet())
+            if not self.is_bottom_side_moebius():
+                n += 1 # the twist
+            length_vector = [random.uniform(epsilon, 1.0) for i in range(n)]
         if self.is_bottom_side_moebius():
             return Foliation(self._gen_perm_list[0], 'moebius', length_vector,
                              flips = self.flips())
         return Foliation(self._gen_perm_list[0], self._gen_perm_list[1],
                          length_vector[:-1], flips = self.flips(),
                          twist = length_vector[-1])
+
 
     def __eq__(self, other):
         r"""
@@ -905,33 +888,43 @@ class Foliation(SageObject):
     #         new_side = (side + 1) % 2
     #     return (p, self.in_which_interval(p, new_side))
 
-
-    def rotated(self, n):
+    def transform(self, interval, hdir):
         from separatrix import Separatrix
         from transition_map import new_foliation
         separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
-        i = Interval(0,0).add_to_position(-n, self)
-        return new_foliation(separatrices, i.endpoint(LEFT, self),
-                             i.endpoint_side(LEFT, self),
-                             is_one_sided = self.is_bottom_side_moebius())
+        return new_foliation(separatrices, interval.endpoint(LEFT, self),
+                             interval.endpoint_side(LEFT, self),
+                             hdir = hdir,
+                             is_one_sided = self.is_bottom_side_moebius(),
+                             transformation_coding = SymmetryCoding(interval, hdir))
+                             
 
-    def reversed(self):
-        from separatrix import Separatrix
-        from transition_map import new_foliation
-        separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
-        return new_foliation(separatrices, 0, TOP, direction = 'left',
-                             is_one_sided = self.is_bottom_side_moebius())
+    # def rotated(self, n):
+    #     from separatrix import Separatrix
+    #     from transition_map import new_foliation
+    #     separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
+    #     i = Interval(0,0).add_to_position(-n, self)
+    #     return new_foliation(separatrices, i.endpoint(LEFT, self),
+    #                          i.endpoint_side(LEFT, self),
+    #                          is_one_sided = self.is_bottom_side_moebius())
+
+    # def reversed(self):
+    #     from separatrix import Separatrix
+    #     from transition_map import new_foliation
+    #     separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
+    #     return new_foliation(separatrices, 0, TOP, direction = 'left',
+    #                          is_one_sided = self.is_bottom_side_moebius())
                                  
     
-    def flip_over(self):
-        if self.is_bottom_side_moebius():
-            raise ValueError("Can't flip over a foliation around a "
-                             "one-sided curve.")
-        from separatrix import Separatrix
-        from transition_map import new_foliation
-        separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
-        return new_foliation(separatrices, 0, BOTTOM, direction = 'right',
-                             is_one_sided = False)
+    # def flip_over(self):
+    #     if self.is_bottom_side_moebius():
+    #         raise ValueError("Can't flip over a foliation around a "
+    #                          "one-sided curve.")
+    #     from separatrix import Separatrix
+    #     from transition_map import new_foliation
+    #     separatrices = Separatrix.get_all(self, number_of_flips_to_stop = 0)
+    #     return new_foliation(separatrices, 0, BOTTOM, direction = 'right',
+    #                          is_one_sided = False)
         
 
     def double_cover(self, foliation_or_surface):

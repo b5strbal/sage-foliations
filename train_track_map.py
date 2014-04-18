@@ -6,8 +6,18 @@ from sage.rings.integer_ring import ZZ
 from train_track import TrainTrackPath
 
 class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
-                     "vertex_map, edge_map")):
+                     "vertex_map, edge_map, coding_list")):
 
+    def __repr__(self):
+        return "Train track map from " + repr(self.domain) + " to " +\
+            repr(self.codomain)
+
+    def __eq__(self, other):
+        return isinstance(other, TrainTrackMap) and \
+            self.domain == other.domain and \
+            self.codomain == other.codomain and \
+            self.vertex_map == other.vertex_map and \
+            self.edge_map == other.edge_map
 
     def __mul__(self, other):
         # f*g means g comes first, then f
@@ -23,9 +33,10 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
                         for e in other.edge_map}
 
         new_map = TrainTrackMap(domain = other.domain,
-                              codomain = self.codomain,
-                              vertex_map = new_vertex_map,
-                              edge_map = new_edge_map)
+                                codomain = self.codomain,
+                                vertex_map = new_vertex_map,
+                                edge_map = new_edge_map,
+                                coding_list = other.coding_list + self.coding_list)
         # if new_map.edge_matrix() !=
         #        self.edge_matrix() * other.edge_matrix():
         # print new_map.edge_matrix(), '\n'
@@ -64,11 +75,6 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
         mlist.extend(tt.kernel_from_singularities())
         return matrix(mlist).right_kernel_matrix()
 
-    @classmethod
-    def identity(cls, tt):
-        return TrainTrackMap(tt, tt,
-                              {v:v for v in tt.vertices()},
-            {e:TrainTrackPath.from_edge(e) for e in tt.edges()})
 
     def is_self_map(self):
         return self.domain == self.codomain
@@ -141,5 +147,23 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
 
 
 
+
+def tt_map_from_codings(start_tt,coding_list):
+    from train_track_map import TrainTrackMap
+    from foliation import SymmetryCoding
+    from transverse_curve import RestrictionCoding, TransverseCurve
+    tt_map_so_far = start_tt.identity_map()
+    for coding in coding_list:
+        if isinstance(coding, SymmetryCoding):
+            tt_map = tt_map_so_far.domain.transform(*coding)
+        elif isinstance(coding, RestrictionCoding):
+            tc = TransverseCurve(coding.foliation, coding.coding)
+            tt_map = tc.new_foliation()[1]
+        else:
+            assert(False)
+
+        tt_map_so_far = tt_map_so_far * tt_map            
+
+    return tt_map_so_far
 
 
