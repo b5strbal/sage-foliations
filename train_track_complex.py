@@ -134,7 +134,7 @@ def get_codings(foliation):
 
 
 
-from infinite_families import family_A_foliation
+from examples import family_A_foliation
 f = family_A_foliation(3, 1, False)
 tt = f.train_track
 ttc = TrainTrackComplex(tt)

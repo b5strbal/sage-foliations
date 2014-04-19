@@ -118,6 +118,7 @@ class PseudoAnosov(SageObject):
             # print edge_matrix, '\n'
             # print vertex_matrix, '\n'
 
+        # print variables
         # print edge_matrix, '\n'
         # print vertex_matrix, '\n'
         # return (edge_matrix, vertex_matrix)

@@ -79,22 +79,22 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
     def is_self_map(self):
         return self.domain == self.codomain
 
-    def action_on_cohomology(self, punctured = False):
+    def action_on_cohomology(self, is_punctured):
         # when the surface is nonorientable, this matrix should be
         # shrinking with eigenvalue 1/alpha, since it is a pullback.
-        basis = self.codomain.basis_of_cohomology(punctured)
+        basis = self.codomain.basis_of_cohomology(is_punctured)
         new_vectors = basis * self.edge_matrix(SIGNED).transpose()
-        U = self.domain.vertex_map_normalizer()
-        new_vectors *= U.transpose()
+
+        new_vectors *= matrix(ZZ, self.domain.cochain_matrix().inverse())
         # the rows represent the range of the linear map, so we transpose it
         return new_vectors.matrix_from_columns(range(new_vectors.nrows())).transpose()
 
-    def invariant_cohomology(self, punctured = False):
+    def invariant_cohomology(self, is_punctured):
         assert(self.is_self_map())
-        action = self.action_on_cohomology(punctured)
+        action = self.action_on_cohomology(is_punctured)
         m = action - matrix.identity(ZZ, action.nrows())
         kernel = m.right_kernel_matrix()
-        basis = self.domain.basis_of_cohomology(punctured)
+        basis = self.domain.basis_of_cohomology(is_punctured)
 
         result = kernel * basis
         return result
