@@ -101,23 +101,23 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
 
 
 
-    # def small_matrix(self):
-    #     # The domain and the codomain should be both one-sided or both
-    #     # two-sided, otherwise the matrix won't be a square matrix
-    #     # Usually this is not a problem, since we only call this method
-    #     # is the underlying permutations are the same which is a much stronger
-    #     # condition.
-    #     m = self.domain.matrix_to_reduce_dimension()
-    #     # print m
-    #     # print self.domain.foliation
-    #     # print self._edge_matrix, '\n'
-    #     result = m.transpose() * self.edge_matrix()
-    #     # print result, '\n'
-    #     result = result.matrix_from_columns(range(
-    #         self.codomain.small_vector_size()))
-    #     # print result, '\n'
+    def small_matrix(self):
+        # The domain and the codomain should be both one-sided or both
+        # two-sided, otherwise the matrix won't be a square matrix
+        # Usually this is not a problem, since we only call this method
+        # is the underlying permutations are the same which is a much stronger
+        # condition.
+        m = self.domain.matrix_to_reduce_dimension()
+        # print m
+        # print self.domain.foliation
+        # print self._edge_matrix, '\n'
+        result = m.transpose() * self.edge_matrix()
+        # print result, '\n'
+        result = result.matrix_from_columns(range(
+            self.codomain.matrix_to_reduce_dimension().ncols()))
+        # print result, '\n'
 
-    #     return result
+        return result
 
     def edge_matrix(self, is_signed = UNSIGNED):
         if not hasattr(self, '_edge_matrix'):

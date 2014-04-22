@@ -1,6 +1,6 @@
 from sage.structure.sage_object import SageObject
 from train_track_class import TrainTrackClass
-from transverse_curve import Coding, TransverseCurve
+from transverse_curve import Coding, TransverseCurve, get_codings
 
 class TrainTrackComplex(DiGraph):
     def __init__(self, first_tt):
@@ -117,19 +117,6 @@ class TrainTrackComplex(DiGraph):
         return result
 
 
-def get_codings(foliation):
-    codings = []
-    for interval in foliation.intervals():
-        if not interval.is_flipped(foliation):
-            codings.append(Coding(interval.side, interval.index,
-                                  0, 0, 0))
-        else:
-            codings.append(Coding(interval.side, interval.index,
-                                  0, 0, 1))
-            codings.append(Coding(interval.side, interval.index,
-                                  1, 0, 1))
-                                
-    return codings
 
 
 

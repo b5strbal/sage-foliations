@@ -127,6 +127,13 @@ def family_A_PA(n, k, is_orientable):
     # return (tt_map.domain, tt_map.codomain)
     return PseudoAnosov(tt_map)
 
+
+fol_min4 = Foliation('e e a b f f d b d c a c', 'moebius', (1, 0.5834783686864043, 0.8827306520664273, 0.6609925318901200, 1.406064340122059, 0.9293980281776905))
+tt_map = tt_map_from_codings(fol_min4.train_track,
+                             [RestrictionCoding(fol_min4, Coding(0,3,1,0,0))])
+pa_min4 = PseudoAnosov(tt_map)
+
+
 # def family_B_tt_map(n, k):
 #     fol = family_B_foliation_nonor(n, k)
 #     coding_list = [Coding(0,0,1,0,0),False,1]

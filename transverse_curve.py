@@ -128,3 +128,17 @@ class TransverseCurve(SageObject):
 RestrictionCoding = namedtuple("RestrictionCoding", "foliation, coding")
 
 
+def get_codings(foliation):
+    codings = []
+    for interval in foliation.intervals():
+        if not interval.is_flipped(foliation):
+            codings.append(Coding(interval.side, interval.index,
+                                  0, 0, 0))
+        else:
+            codings.append(Coding(interval.side, interval.index,
+                                  0, 0, 1))
+            codings.append(Coding(interval.side, interval.index,
+                                  1, 0, 1))
+                                
+    return codings
+
