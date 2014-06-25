@@ -1,3 +1,25 @@
+r"""
+General supporting math functions.
+
+AUTHORS:
+
+- Balazs Strenner (2014-06-16): initial version
+
+EXAMPLES::
+
+
+"""
+
+#*****************************************************************************
+#       Copyright (C) 2014 Balazs Strenner <strennerb@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#                  http://www.gnu.org/licenses/
+#*****************************************************************************
+
 from sage.structure.sage_object import SageObject
 from mymath import mod_one
 from collections import namedtuple
@@ -143,6 +165,36 @@ class TrainTrack(SageObject):
         # return m.echelon_form(include_zero_rows = False)
 
     def coboundary_map_from_vertices(self, cochain_type):
+        r"""
+        Return the coboundary map `C^0(X) \to C^1(X)` as a matrix.
+
+        INPUT:
+
+        - ``cochain_type`` -- determines if the type of cochain
+          complex. If the value is the constant ``COHOMOLOGY``, then
+          the usual cellular cohomology cochain complex is
+          considered. If the value is ``TRAIN_TRACK_MODULE``, then the
+          train track module complex (cf. [MCM2000]_, Equation 2.2) is
+          considered instead. 
+
+        OUTPUT:
+
+        a matrix of size `e \times v`, where `e` is the number of
+        edges and `v` is the number of vertices of the train track.
+        The matrix contains only 0, +1 and -1, and every row contains
+        exactly two non-zero entries.
+        What value is chosen for ``cochain_type`` only affects the
+        signs of certain non-zero entries, otherwise the two output
+        matrices are the same.
+
+        REFERENCES:
+
+        .. [MCM2000] McMullen, Curtis T., Polynomial invariants for
+              fibered 3-manifolds and Teichmueller geodesics for
+              foliations, 2000.
+        
+        """
+
         if self._coboundary_map[cochain_type] == None:             
             m = matrix(ZZ, len(self._index_to_edge), len(self._index_to_vertex))
             if cochain_type == COHOMOLOGY:
@@ -164,6 +216,61 @@ class TrainTrack(SageObject):
         return self._coboundary_map[cochain_type]
 
     def _compute_edge_cocycles(self):
+        """Compute the space of edge cocycles in the cellular cochain complex.
+
+        Cellular cohomology is defined using the cochain complex `0
+        \rightarrow C^0(X) \stackrel{\delta^1}{\rightarrow} C^1(X)
+        \stackrel{\delta^2}{\rightarrow} C^2(X) \rightarrow 0`. Here
+        `X` stands for the closed surface. `H^1(X) =
+        ker(\delta^2)/im(\delta^1)`. To calculate the cohomology of
+        the surface `X'` punctured at the singularities, the above
+        cochain complex should be modifies so that `C^2(X') = 0`, so
+        `\delta^2(X') = 0`, so `H^1(X') = C^1(X) / im(\delta^1)`.
+
+        This function computes the decomposition of `C^1(X)` into
+        
+        - `im(\delta^1)`, the space of coboundaries (`A`). This space is
+        described by a matrix whose rows are generating vectors. This
+        matrix is Gauss eliminated, and the pivots correspond to edges
+        that define a maximal subtree (spine) whose collapsing to a point
+        results in a wedge of circles. (If this subgraph had a cycle,
+        we could construct a coboundary that doesn't vanish on that
+        cycle. And it is maximal, because the dimension of
+        `im(\delta^1)` is the number of vertices minus 1, the same as
+        number of edges of a spine.)
+
+        - a complementing generating set of `im(\delta^1)` in
+          `ker(\delta^2)` with vanishing entries on the spine (`B`)
+
+        - a complementing generating set of `ker(\delta^2)` in the
+          whole `C^1(X)`, again with vanishing entries on the
+          spine. (`C`)
+
+        Thus, we have `C^1(X) = A \oplus B \oplus C`, `ker(\delta^2) =
+        A \oplus B` and `im(\delta^1) = A`. Therefore `B` is a space of
+        representatives for `H^1(X)`, while `B\oplus C` is that of `H^1(X')`.
+
+        This function doesn't return anything, but instead sets the
+        following variables:
+
+        - ``self._basis_of_cohomology_closed`` -- a matrix whose rows
+          generate `B`. The number of rows equals `dim(H^1(X))`.
+
+        - ``self._basis_of_cohomology_punctured`` -- a matrix whose
+        rows generate `B\oplus C`. In particular, the first `dim(B)`
+        rows are the same as in
+        ``self._basis_of_cohomology_closed``. The number of rows
+        equals `dim(H^1(X')`.
+        
+        - ``self._cochains`` -- This is a full `e \times e` matrix,
+        where `e = dim(C^1(X))` is the number of edges of the train
+        track, whose rows generate `C^1(X)` such that: (1) the first
+        `dim(B \oplus C)` rows are the same as in
+        ``self._basis_of_cohomology_punctured``; (2) the remaining
+        rows are generating space of the coboundary space `A`
+
+        """
+
         C = self.coboundary_map_from_vertices(COHOMOLOGY)
         D, U, V = C.smith_form() # D = U * C * V
 
@@ -183,8 +290,8 @@ class TrainTrack(SageObject):
 
         # adjusting the basis such that all entries are zero in the columns
         # definied by the pivots of coboundaries (which in turn define the
-        # edges of the minimal subtree if the train track where all the
-        # cohomology representatives vanish.
+        # edges of the maximal subtree in the train track where all the
+        # cohomology representatives vanish).
         pivots = coboundaries.pivots()
         X = basis.matrix_from_columns(pivots)
         basis -= X * coboundaries
@@ -223,7 +330,9 @@ class TrainTrack(SageObject):
         # BUG: when the twist is longer than the first interval, this, and the 
         # small matrix calculation is buggy
         
-        if hasattr(self, '_reducing_matrix'):
+        if hasattr(self
+
+        , '_reducing_matrix'):
             return self._reducing_matrix
         from copy import copy
         from sage.rings.rational import Rational

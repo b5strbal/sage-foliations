@@ -1,3 +1,25 @@
+r"""
+General supporting math functions.
+
+AUTHORS:
+
+- Balazs Strenner (2014-06-16): initial version
+
+EXAMPLES::
+
+
+"""
+
+#*****************************************************************************
+#       Copyright (C) 2014 Balazs Strenner <strennerb@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#                  http://www.gnu.org/licenses/
+#*****************************************************************************
+
 from foliation import Foliation
 from transverse_curve import Coding
 from train_track_map import tt_map_from_codings
@@ -121,7 +143,7 @@ def family_A_PA(n, k, is_orientable):
                        SymmetryCoding(Interval(0,1), RIGHT)]
     else:
         b = 2*n-4 if k > 1 else 1
-        coding_list = [Coding(0,0,0,0,0),Coding(1,b,0,0,0),False,-1]
+        coding_list = [RestrictionCoding(fol,Coding(0,0,0,0,0)),Coding(1,b,0,0,0),SymmetryCoding(Interval(0,1), RIGHT)]
 
     tt_map = tt_map_from_codings(fol.train_track, coding_list)
     # return (tt_map.domain, tt_map.codomain)
@@ -138,3 +160,17 @@ pa_min4 = PseudoAnosov(tt_map)
 #     fol = family_B_foliation_nonor(n, k)
 #     coding_list = [Coding(0,0,1,0,0),False,1]
 #     return tt_map_from_codings(fol, coding_list)
+
+
+def family_A_PA_other(n, k, is_orientable):
+    fol = family_A_foliation(n, k, is_orientable)
+    if not is_orientable:
+        coding_list = [RestrictionCoding(fol, Coding(0,0,0,0,0)),
+                       SymmetryCoding(Interval(0,5), LEFT)]
+    else:
+        b = 2*n-4 if k > 1 else 1
+        coding_list = [RestrictionCoding(fol,Coding(0,0,0,0,0)),Coding(1,b,0,0,0),SymmetryCoding(Interval(0,1), RIGHT)]
+
+    tt_map = tt_map_from_codings(fol.train_track, coding_list)
+    # return (tt_map.domain, tt_map.codomain)
+    return PseudoAnosov(tt_map)

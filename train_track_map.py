@@ -1,3 +1,26 @@
+r"""
+General supporting math functions.
+
+AUTHORS:
+
+- Balazs Strenner (2014-06-16): initial version
+
+EXAMPLES::
+
+
+"""
+
+#*****************************************************************************
+#       Copyright (C) 2014 Balazs Strenner <strennerb@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#                  http://www.gnu.org/licenses/
+#*****************************************************************************
+
+
 from constants import *
 # from mymath import is_perron_frobenius
 from collections import namedtuple
@@ -151,14 +174,17 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
 def tt_map_from_codings(start_tt,coding_list):
     from train_track_map import TrainTrackMap
     from foliation import SymmetryCoding
-    from transverse_curve import RestrictionCoding, TransverseCurve
+    from transverse_curve import RestrictionCoding, TransverseCurve, Coding
     tt_map_so_far = start_tt.identity_map()
     for coding in coding_list:
         if isinstance(coding, SymmetryCoding):
             tt_map = tt_map_so_far.domain.transform(*coding)
         elif isinstance(coding, RestrictionCoding):
             tc = TransverseCurve(coding.foliation, coding.coding)
-            tt_map = tc.new_foliation()[1]
+            fol, tt_map = tc.new_foliation()
+        elif isinstance(coding, Coding):
+            tc = TransverseCurve(fol, coding)
+            fol, tt_map = tc.new_foliation()
         else:
             assert(False)
 

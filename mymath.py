@@ -1,3 +1,25 @@
+"""
+General supporting math functions.
+
+AUTHORS:
+
+- Balazs Strenner (2014-06-16): initial version
+
+EXAMPLES::
+
+
+"""
+
+#*****************************************************************************
+#       Copyright (C) 2014 Balazs Strenner <strennerb@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#                  http://www.gnu.org/licenses/
+#*****************************************************************************
+
 from sage.structure.sage_object import SageObject
 from collections import deque
 from sage.matrix.constructor import matrix, vector
@@ -10,19 +32,19 @@ from sage.functions.other import floor
 
 def mod_one(x):
     """
-    Returns a number modulo 1.
+    Return ``x`` mod 1.
 
     INPUT:
 
-    - ``x`` - a real number
+    - ``x`` -- a real number
 
     OUTPUT:
 
-    - a real number of the same type as the input
+    ``x`` mod 1, a number in `[0,1)`.
 
     TESTS::
 
-        sage: from sage.dynamics.foliations.foliation import mod_one
+        sage: from sage.dynamics.foliations.mymath import mod_one
         sage: mod_one(2.5)
         0.500000000000000
         sage: mod_one(-1.7)
@@ -39,17 +61,52 @@ def mod_one(x):
     """
     return x - floor(x)
 
-# def tomob(x):
-#     return mod_one(2 * x)
-
 class OrientedGraph(SageObject):
+    r"""
+    Simple digraph class for checking primitivity of a matrix.
+
+    Vertices of the graph are represented by numbers between 0 and
+    `n-1` where `n` is the number of vertices.
+
+    INPUT:
+        
+    - ``square_matrix`` -- a square matrix with non-negative integer
+    entries, the adjacency matrix of the graph.
+
+    """
     def __init__(self, square_matrix):
-        self._n = square_matrix.nrows()
-        self._adj_list = matrix_to_adj_list(square_matrix)
-        self._backward_adj_list = matrix_to_adj_list(square_matrix.transpose())
-            
+        r"""
+        Constructor.
+        
+        """
+        m = square_matrix
+        assert(m.is_square())
+        for i in range(m.nrows()):
+            for j in range(m.ncols()):
+                asssert(m[i,j] >= 0)
+                
+        self._n = m.nrows()
+        self._adj_list = matrix_to_adj_list(m)
+        self._backward_adj_list = matrix_to_adj_list(m.transpose())
 
     def bfs_distances(self, v, backward = False):
+        """
+        Return the distances of vertices measured from ``v``.
+
+        The distance from itself, 0, is also included.
+        
+        INPUT:
+        
+        - ``v`` -- an integer, representing a vertex
+
+        - ``backward`` -- (default: False) if False, the distances are
+          measured FROM ``v``, otherwise TO ``v``.
+
+        OUTPUT:
+
+        the list of the distances (non-negative integers)
+
+        """
         adj_list = self._backward_adj_list if backward else self._adj_list
         done = set([v])
         queue = deque([v])
@@ -65,6 +122,30 @@ class OrientedGraph(SageObject):
         return distances
 
     def is_primitive(self):
+        """Decide if the adjacency matrix is primitive.
+
+        OUTPUT:
+
+        True of False, depending on whether the matrix is primitive or
+        not
+
+        ALGORITHM:
+
+        `Leegard
+        <http://ir.library.oregonstate.edu/xmlui/bitstream/handle/1957/31568/LeegardAmandaD2003.pdf?sequence=1>`_
+        [LEE2002]_ has given a fast algorithm for determining
+        primitivity. The idea is that it is sufficient to calculate
+        the lengths of certain cycles containing a fixed vertex ``v``,
+        and the matrix adjacency matrix is primitive if and only if
+        the gcd of these lengths is 1.
+
+        REFERENCES:
+
+        .. [LEE2002] Amanda D. Leegard. A Fast Algorithm for
+        Determining Primitivity of an `n\times n` non-negative
+        matrix. Thesis, 2002.
+
+        """
         P = self.bfs_distances(0, backward = True)
         Q = self.bfs_distances(0, backward = False)
         if None in P or None in Q: # not strongly connected
@@ -75,11 +156,33 @@ class OrientedGraph(SageObject):
         if any(i in self._adj_list[i] for i in xrange(self._n)):
             return True
         # once it is strongly connected, it is primitive if and only if
-        # the gcd of cycle lengths in 1
+        # the gcd of cycle lengths is 1
         return gcd(list(C)) == 1
 
 
 def fixed_charpoly(M, variables):
+    """
+    Calcualate the characterictic polynomials of a matrix with entries
+    in a group ring.
+
+    The problem is that Sage doesn't do a good job at calculating
+    characteristic polynomials of matrices over Symbolic Ring in
+    certain cases. To overcome this, we create a new matrix over a
+    Polynomial Ring where inverses of the variables are replaced with
+    new variable, calculate the charpoly, then substitute back.
+
+    INPUT:
+
+    - ``M`` -- a square matrix over Symbolic Ring
+
+    - ``variables`` -- the list of variables appearing in the entries
+      of ``M``
+
+    OUTPUT:
+
+    the characterictic polynomial of ``M``
+
+    """
     sub_vars = {v : var(str(v) + 'inv') for v in variables}
     # print sub_vars
     ring = PolynomialRing(ZZ, variables + sub_vars.values()) \

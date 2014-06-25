@@ -1,3 +1,25 @@
+r"""
+General supporting math functions.
+
+AUTHORS:
+
+- Balazs Strenner (2014-06-16): initial version
+
+EXAMPLES::
+
+
+"""
+
+#*****************************************************************************
+#       Copyright (C) 2014 Balazs Strenner <strennerb@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#                  http://www.gnu.org/licenses/
+#*****************************************************************************
+
 from collections import namedtuple
 from pseudo_anosov import PseudoAnosov
 from foliation import SymmetryCoding

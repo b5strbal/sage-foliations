@@ -1,3 +1,24 @@
+r"""
+General supporting math functions.
+
+AUTHORS:
+
+- Balazs Strenner (2014-06-16): initial version
+
+EXAMPLES::
+
+
+"""
+
+#*****************************************************************************
+#       Copyright (C) 2014 Balazs Strenner <strennerb@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#                  http://www.gnu.org/licenses/
+#*****************************************************************************
 
 from sage.structure.sage_object import SageObject
 
@@ -80,7 +101,7 @@ class FoliationLatex(SageObject):
             format(u = u, v = v)
 
     def _tikz_of_curve(self, transverse_curve):
-        arcshift = RIGHT if transverse_curve.direction() == 'left' else LEFT
+        arcshift = RIGHT if transverse_curve.direction() == LEFT else LEFT
         ep = [transverse_curve.arc()[i] for i in [0,1]]
         u, v = [shift_point(ep[i], arcshift) for i in [0,1]]
         
