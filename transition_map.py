@@ -26,8 +26,7 @@ from train_track import TrainTrackPath
 from train_track_map import TrainTrackMap
 from collections import namedtuple
 from foliation import Foliation, SaddleConnectionError
-from mymath import mod_one
-from constants import *
+from base import *
 from interval import Interval
 
 def new_foliation(separatrices, adj_starting_point, adj_starting_side,
@@ -114,15 +113,15 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
     # print lengths
     old_fol = separatrices[0][0].foliation
 
-    x = sum(list(lengths.values()))
-    y = arc_length
-    # if old_fol.is_bottom_side_moebius():
-    #     y = 2
-    if abs(x - y) > epsilon:
-        print x, y
-        print old_fol
-        print lengths
-        exit()
+    # x = sum(list(lengths.values()))
+    # y = arc_length
+    # # if old_fol.is_bottom_side_moebius():
+    # #     y = 2
+    # if abs(x - y) > EPSILON:
+    #     print x, y
+    #     print old_fol
+    #     print lengths
+    #     exit()
 
     # try:
     new_fol = Foliation(*gen_perm, lengths = lengths,
@@ -145,8 +144,8 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
 
 
 def get_tt_map(old_fol, new_fol, path_entries, transformation_coding):
-    tt_new = new_fol.train_track
-    tt_old = old_fol.train_track
+    tt_new = new_fol.train_track()
+    tt_old = old_fol.train_track()
     vertex_map = {}
     edge_map = {}
 
@@ -154,18 +153,20 @@ def get_tt_map(old_fol, new_fol, path_entries, transformation_coding):
     # more specifically, the long vertical end of it.
     to_be_corrected = []
     if not new_fol.is_bottom_side_moebius():
-        long_path_int = (BOTTOM, new_fol.num_intervals(1) - 1)
+        long_path_int = Interval(BOTTOM, new_fol.num_intervals(BOTTOM) - 1)
         
     else:
         side, pos = new_fol.in_which_interval(0, BOTTOM)
-        long_path_int = (0, pos)
+        long_path_int = Interval(0, pos)
         
     # Also, finding the intervals on the opposite side of it that will need
     # to be corrected.
-    start = new_fol.divvalues[long_path_int[0]][long_path_int[1]]
+    start = long_path_int.endpoint(LEFT, new_fol)
+    # new_fol.divpoints[long_path_int[0]][long_path_int[1]]
     bound = start + 0.5 if new_fol.is_bottom_side_moebius() else start
-    n = new_fol.num_intervals(0) - 1
-    while new_fol.divvalues[0][n] > bound:
+    n = new_fol.num_intervals(TOP) - 1
+    
+    while Interval(TOP, n).endpoint(LEFT, new_fol) > bound:
         to_be_corrected.append((0,n))
         n -= 1
 
@@ -255,7 +256,7 @@ PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 def get_pair_and_path(separatrices, side, i, end, 
                        lift_type, hdir, ending_point, do_we_cut):
     fol = separatrices[0][0].foliation 
-    tt = fol.train_track
+    tt = fol.train_track()
     s0 = separatrices[side][(i + end) % len(separatrices[side])]
 
             

@@ -25,27 +25,18 @@ from sage.symbolic.ring import var, SR
 from sage.rings.real_double import RDF
 from sage.misc.misc_c import prod
 from sage.matrix.constructor import matrix
-from mymath import fixed_charpoly, NoPFEigenvectorError, pf_eigen_data
-from constants import epsilon, TRAIN_TRACK_MODULE
+from base import EPSILON, TRAIN_TRACK_MODULE
 from interval import Interval
 
 class PseudoAnosov(SageObject):
     def __init__(self, tt_map):
-        if not tt_map.is_self_map():
-            raise ValueError("The train track map should be a self-map.")
-        m = tt_map.edge_matrix().transpose()
-        try:
-            eigenvalue, eigenvector = pf_eigen_data(m, RDF)
-        except NoPFEigenvectorError as ex:
-            # print "No PF Eigendata: ", ex
-            raise ValueError("The transition map of the train track map "
-                             "doesn't have a PF eigenvector.")
+        eigenvalue, eigenvector = tt_map.get_PF_weights(RDF)
 
         tt = tt_map.domain
 
         # making sure that the vertex conditions are met
         C = tt.coboundary_map_from_vertices(TRAIN_TRACK_MODULE).transpose()
-        if abs(C*eigenvector) > epsilon:
+        if abs(C*eigenvector) > EPSILON:
             raise ValueError("The PF eigenvector is not an allowable "
                              "weights vector.")
 
@@ -156,6 +147,7 @@ class PseudoAnosov(SageObject):
 
 
 
+
 def get_variables(n):
     if n == 0:
         return []
@@ -184,3 +176,44 @@ def find_next_edge_index(tt, vertex_matrix, edge_matrix):
                 return i
     return -1
     
+
+
+def fixed_charpoly(M, variables):
+    """
+    Calcualate the characterictic polynomials of a matrix with entries
+    in a group ring.
+
+    The problem is that Sage doesn't do a good job at calculating
+    characteristic polynomials of matrices over Symbolic Ring in
+    certain cases. To overcome this, we create a new matrix over a
+    Polynomial Ring where inverses of the variables are replaced with
+    new variable, calculate the charpoly, then substitute back.
+
+    INPUT:
+
+    - ``M`` -- a square matrix over Symbolic Ring
+
+    - ``variables`` -- the list of variables appearing in the entries
+      of ``M``
+
+    OUTPUT:
+
+    the characterictic polynomial of ``M``
+
+    """
+    from sage.rings.polynomial.polynomial_ring_constructor import \
+    PolynomialRing
+    sub_vars = {v : var(str(v) + 'inv') for v in variables}
+    ring = PolynomialRing(ZZ, variables + sub_vars.values()) \
+           if len(variables) > 0 else ZZ
+    new_M = matrix(ring, M.nrows(), M.ncols())
+    for i in xrange(M.nrows()):
+        for j in xrange(M.ncols()):
+            exp = M[i,j]
+            a = exp.numerator()
+            b = exp.denominator()
+            new_M[i,j] = a * b.subs(sub_vars)
+    poly = new_M.charpoly('x')
+    back_sub = {str(sub_vars[v]) : 1/v for v in sub_vars}
+    poly = poly.subs(**back_sub)
+    return poly

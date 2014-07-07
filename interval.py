@@ -20,15 +20,11 @@ EXAMPLES::
 #                  http://www.gnu.org/licenses/
 #*****************************************************************************
 
-from mymath import mod_one
+from base import mod_one, LEFT, MID, RIGHT
 from collections import namedtuple
-from constants import *
+
 
 class Interval(namedtuple('Interval', 'side, index')):
-    # def __new__(cls, side, index, foliation):
-    #     self = super(Foliation.Interval, cls).__new__(cls, side, index)
-    #     self._foliation = foliation
-    #     return self
 
     def __repr__(self):
         return repr((self.side, self.index))
@@ -42,7 +38,7 @@ class Interval(namedtuple('Interval', 'side, index')):
 
     def raw_endpoint(self, hdir, fol):
         new_hdir = LEFT if hdir == MID else hdir
-        x = fol.divvalues[self.side][(self.index + new_hdir)
+        x = fol._divpoints[self.side][(self.index + new_hdir)
                 % fol.num_intervals(self.side)]
         if hdir == MID:
             return mod_one(x + self.length(fol)/2)
@@ -62,10 +58,37 @@ class Interval(namedtuple('Interval', 'side, index')):
         return self.add_to_position(-1, fol)
 
     def label(self, fol):
-        return fol.labels()[self.side][self.index]
+        return fol._gen_perm_list[self.side][self.index]
 
+    def numerical_label(self, fol):
+        """Return the numerical label of the letter.
+
+        The `n` labels used to code the permutation of intervals are
+        associated with numerical labels from 0 to `n-1` to make some
+        calculations more convenient. The numbers from 0 to `n-1` are
+        associated to the labels in the order of their appearance.
+
+        INPUT:
+
+        - ``fol`` -- the underlying ``Foliation``
+
+        OUTPUT:
+
+        a non-negative integer, the numerical label of the interval
+
+        EXAMPLES::
+
+        sage: f = Foliation('a b b c a c','d d',flips='abc')
+        sage: [Interval(0,i).numerical_label(f) for i in range(6)]
+        [0, 1, 1, 2, 0, 2]
+        sage: [Interval(1,i).numerical_label(f) for i in range(2)]        
+        [3, 3]
+
+        """
+        return fol._numerical_label[self.label(fol)]
+    
     def length(self, fol):
-        return fol.length_of_label(self.label(fol))
+        return fol._lengths[self.label(fol)]
 
     def is_wrapping(self, fol):
         return self.endpoint(LEFT, fol) > self.endpoint(RIGHT, fol)

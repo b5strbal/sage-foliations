@@ -21,7 +21,7 @@ EXAMPLES::
 #*****************************************************************************
 
 from sage.structure.sage_object import SageObject
-from mymath import mod_one
+from base import mod_one
 
 class Arc(SageObject):
     """

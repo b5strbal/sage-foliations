@@ -1,5 +1,5 @@
 r"""
-General supporting math functions.
+
 
 AUTHORS:
 
@@ -23,11 +23,10 @@ EXAMPLES::
 from sage.dynamics.interval_exchanges.constructors import GeneralizedPermutation
 from sage.structure.sage_object import SageObject
 from sage.matrix.constructor import vector
-from mymath import mod_one
+from base import *
+import random
 
 from interval import Interval
-from constants import *
-from myexceptions import SaddleConnectionError
 from sage.rings.rational import Rational
 from collections import namedtuple
 
@@ -35,243 +34,333 @@ SymmetryCoding = namedtuple("SymmetryCoding", "interval, hdir")
 
 
 class Foliation(SageObject):
-    """
-    A measured foliation on a surface of finite type.
+    r"""
+    A singular measured foliation on a surface.
 
-    Given a measured foliation we consider a two-sided simple closed
-    curve on the surface which is transverse to the foliation. This 
-    gives an interval exchange of the circle which is represented by
-    an Involutions, length parameters, and a twist parameter. The 
-    measure is always normalized so that the length of the curve is 1.
+    Given a singular measured foliation we consider a simple closed
+    curve `\gamma` on the surface which is transverse to the foliation. A small
+    neighborhood of `\gamma` is a Moebius strip or an annulus
+    depending on whether `\gamma` is one-sided or two-sided. The
+    foliation defines an interval exchange on the boundary `B` of this
+    neighborhood defined as follows. Consider the first intersections
+    of the separatrices of the foliation with `B`. They divide the
+    circle componenents of `B` to intervals, which are identified by
+    the foliation is pairs. 
 
-    We consider only surfaces with negative Euler characteristic, so
-    foliations on the closed tori and closed Klein bottle are not 
-    represented. By the Euler-Poincare theorem the foliation must have
-    an even number of separatrices, say $2k$, where $k > 0$. There
-    are two cases: all these separatrices hit our simple closed curve
-    from above, or there is at least one separatrix hitting each side.
+    NOTE: We will assume that there is at least one division point
+    on each component of `B`. Therefore foliations on the closed torus
+    or the Klein bottle -- that don't have singularities -- cannot be
+    represented. In general, foliations on surfaces with negative Euler
+    characteristic (including the punctured tori and Klein bottles)
+    are considered.
 
-    In the first case the bottom side of the curve is a Moebius band,
-    so we don't need a twist parameter. But even though we wouldn't
-    need a length parameter for the bottom side to uniquely
-    represent the foliation (it can be expressed in terms of the 
-    length parameters above the curve), we consider 1/2 as the twist
-    paratemeter for the bottom side with interval exchange imagined
-    as 'z z'. Thus we have $k + 1$ parameters.
+    NOTE: Another convention is that the surface is assumed to have as
+    few punctures are allowed by the foliation, i.e. punctures are
+    exactly at 1-pronged and 2-pronged singularities. (1-pronged
+    singularities are only allowed at punctures, and a 2-pronged
+    singularity is only a singularity if it is at a puncture.) At this
+    point there is no way to represent a foliation that has a
+    3-pronged singularity at a puncture, for example. 
 
-    In the other case there are $k$ length parameters (which again
-    may not be independent), but a twist parameter here is 
-    necessary which is $k + 1$ parameters again. This consistency may
-    be useful for dealing with transition matrices between parameters
-    of the same foliation, but looked at from the perspective of
-    different simple closed curves.
+    We normalize the measure such that components of `B` have measure
+    1. So the measure of `\gamma` is 1 or 1/2 if it is two-sided or
+    one-sided, respectively. This way we can parametrize the division
+    points with numbers between 0 and 1. We choose 0 to be one of the
+    division points. There are as many choices as division
+    points. There are also two ways of choosing the direction of the
+    identification of `[0,1]` with components of `B`. 
+
+    If `B` has two components, we will call one the top side, the
+    other the bottom side. When there is one component, we will call
+    that the top side, and say that there is a Moebius band on the
+    bottom side. Label the intervals on each side so that pairs have
+    the same label. Some pairs of intervals are identified by a
+    translation, some by a flips. We will define the foliation by the
+    list of top and bottom labels, the set of flipped labels, the
+    lengths of the intervals, and the twist in case `B` has two
+    components.
+
+    The conventions for defining and printing interval exchanges are
+    the same as in iet.GeneralizedPermutation.
 
     INPUT:
 
-    - ``involution`` - an Involution, serving as the combinatorial
-      description of the interval exchange
+    - ``top_labels``, ``bottom_letters`` -- either strings of the
+      labels separated by spaces or lists of the label strings. The
+      two list correspond to the two components of `B`. To indicate
+      that there is one component, i.e. that `\gamma` is one-sided,
+      set ``bottom_letters`` to ``moebius``. 
 
-    - ``lenghts`` - as in iet.IntervalExchangeTransformation,
-      this is either a list, tuple or dictionary of the length parameters.
-      If it is a list or tuple, then the lengths are assigned to intervals
-      in the order of their appearance in the Involution (their
-      "index"). If it's a dict, then lengths should be assigned to
-      the names of the intervals in the Involution.
 
-    - ``twist`` - a real number, the twist parameter. This can 
-      (and recommended to) be omitted if the bottom side is a 
-      Moebius band, otherwise it is mandatory, because defaulting to
-      zero would lead to an immediate saddle connection.
+    - ``lengths`` -- (default: None) as in
+    iet.IntervalExchangeTransformation, this is either a list, tuple
+    or dictionary of the length parameters.  If it is a list or
+    tuple, then the lengths are assigned to intervals in the order
+    of their appearance in the ``top_letters`` and
+    ``bottom_letters``. The length of the list or tuple should equal
+    the number of labels. If it's a dict, it should contain entries
+    in the form label:length. Finally, if omitted, lengths are
+    generated randomly.
+
+    - ``flips`` -- (default: []) the list of flipped labels. It the
+      labels consist of single characters, ``flips`` can be a string
+      containing those characters.
+    
+    - ``twist`` -- (default:None) a real number, the twist
+    parameter. When `\gamma` is one-sided, this argument is ignored,
+    because `B` has only one component, so the twist doesn't have a
+    meaning. Otherwise it should be some non-zero number (otherwise
+    there is a saddle connection). Omitting it generates a random twist.
 
     EXAMPLES:
     
     Here are two different but equivalent definitions::
 
-        sage: i = Involution('a a b b', 'c c', flips = 'b')
-        sage: f = Foliation(i, [1, 2, 3], 1/2); f
-        a a -b -b
-        c c
-        Lengths: (1/6, 1/3, 1/2)
+        sage: f = Foliation('a a b b', 'c c', [1, 2, 3], twist=1/2, flips = 'b'); f
+         a a -b -b
+         c c
+        Lengths: {'1': 1/6, '3': 1/2, '2': 1/3}
         Twist: 1/12
 
-        sage: g = Foliation(i, {'a':1,'b':2,'c':3}, 1/2); f
-        a a -b -b
-        c c
-        Lengths: (1/6, 1/3, 1/2)
+        sage: g = Foliation(['a','a','b','b'], ['c','c'], {'a':1,'b':2,'c':3}, twist=1/2, flips = 'b'); g
+         a a -b -b
+         c c
+        Lengths: {'1': 1/6, '3': 1/2, '2': 1/3}
         Twist: 1/12
 
         sage: f == g
         True
 
-    Omitting the twist if the bottom side is not a Moebius band
-    throws an error::
+    Omitting lengths and/or twist is fine, they are generated randomly::
 
-        sage: Foliation(i, [1, 2, 3])
-        Traceback (most recent call last):
-        ...
-        ValueError: The twist must be specified unless the bottom side is a Moebius band.
+        sage: f = Foliation('a a b b', 'c c')
 
-    When the bottom side is a Moebius band, it is okay to omit the 
-    twist::
+    If `\gamma` is two-sided, the lengths of the two components of `B`
+    are equal, so in that sense certain length specifications are
+    illegal. Instad of raising an error, however, if the sum of the
+    lengths on top and bottom are not equal, the lengths are
+    automatically adjusted to make it work::
 
-        sage: Foliation(Involution('a a b b c c'), [2, 2, 1])
-        a a b b c c
-        Moebius band
-        Lengths: (1/5, 1/5, 1/10)
-
-    The sum of the lengths on top and the sum at the bottom should
-    (approximately) equal::
-
-        sage: Foliation(i, [1, 1, 3], 1/2)
-        Traceback (most recent call last):
-        ...
-        ValueError: The total length on the top and bottom are inconsistent.
-
-    If they are just approximately equal, then on top of the
-    normalization, the lengths are adjusted so the sums on top and 
-    bottom are equal::
-
-        sage: Foliation(i, [1, 2, 3.0000000000001], 1/2)
-        a a -b -b
+        sage: Foliation('a a b b','c c', [0.2, 0.3, 0.5000001], twist
+        = 0.15)
+        a a b b
         c c
-        Lengths: (0.166666666666661, 0.333333333333322, 0.500000000000017)
-        Twist: 0.0833333333333306
+        Lengths: {'a': 0.200000059999988, 'c': 0.500000000000000, 'b': 0.299999940000012}
+        Twist: 0.149999970000006
+      
+    For easier comparison of two ``Foliation`` objects, the twist is
+    normalized to a positive number as small as possible by cyclically
+    permuting the bottom labels::
 
-    In reality, the same twisted interval exchange transformation can
-    be represented by different Involutions and twist parameters. 
-    For instance depending on which separatrix is chosen to be zero,
-    the top letters can be 'a a b b', 'a b b a', 'b b a a' or
-    'b a a b'. But even if one chooses one of these, varying the twist
-    and the Involution can result in the same Foliation::
+       sage: f=Foliation('a b c','c b a', [0.1, 0.2, 0.7], twist =
+       0.25); f
+       a b c
+       a c b
+       Lengths: {'a': 0.100000000000000, 'c': 0.700000000000000, 'b': 0.200000000000000}
+       Twist: 0.150000000000000
+    
+    Saddle connections are not checked in the constructor, for
+    instance the following doesn't give an error::
 
-        sage: i = Involution('a b c', 'a c b'); i
-        a b c
-        a c b
-        sage: f = Foliation(i, [1, 2, 3], 1); f
-        a b c
-        a c b
-        Lengths: (1/6, 1/3, 1/2)
-        Twist: 1/6
+       sage: f=Foliation('a b c d','d c b a', [0.25, 0.25, 0.25, 0.25], twist = 0.25)
 
-        sage: j = Involution('a b c', 'c b a'); j
-        a b c
-        c b a
-        sage: g = Foliation(j, [1, 2, 3], 2); g
-        a b c
-        a c b
-        Lengths: (1/6, 1/3, 1/2)
-        Twist: 1/6
-
-        sage: f == g
-        True
-
-    So rotate the bottom row of the Involution and change the twist
-    if necessary to obtain the smallest possible positive twist. One
-    can easily check that the Foliations f and g above have an 
-    immediate saddle connection therefore they are not candidates for
-    pseudo-anosov stable foliations. We don't check this in the
-    constructor, only later when separatrices are lengthened to find
-    other curves.
+    However, certain methods will raise an error when they realize the
+    saddle connections. Certain permutations result in saddle
+    connections for arbitrary length and twist parameters. These
+    permutations are not straightforward to detect, so no error is
+    given. For instance 'a a b b', 'c c' is such a permutation.
 
     """ 
 
-
-    def __init__(self, top_letters, bottom_letters, lengths, flips = [], 
+    def __init__(self, top_labels, bottom_letters, lengths = None, flips = [], 
             twist = None):
         """
         TESTS::
-
-            sage: i = Involution('a b c', 'a c b'); i
+            sage: f = Foliation('a b c','a c b', [1, 2, 3], twist=1); f
             a b c
             a c b
-            sage: f = Foliation(i, [1, 2, 3], 1); f
-            a b c
-            a c b
-            Lengths: (1/6, 1/3, 1/2)
+            Lengths: {'a': 1/6, 'c': 1/2, 'b': 1/3}
             Twist: 1/6
             sage: f._divpoints
-            [[(0, (0, 0, 0, 0)), (1/6, (1, 0, 0, 0)), (1/2, (1, 1, 0, 0))], [(1/6, (0, 0, 0, 1)), (1/3, (1, 0, 0, 1)), (5/6, (1, 0, 1, 1))]]
-            sage: f._divvalues
             [[0, 1/6, 1/2], [1/6, 1/3, 5/6]]
             sage: f._lengths['a']
-            (1/6, (1, 0, 0, 0))
+            1/6
             sage: f._lengths['b']
-            (1/3, (0, 1, 0, 0))
+            1/3
             sage: f._lengths['c']
-            (1/2, (0, 0, 1, 0))
+            1/2
             sage: f._twist
-            (1/6, (0, 0, 0, 1))
-            sage: f._involution
+            1/6
+            sage: f._gen_perm
             a b c
             a c b
-
-            sage: i = Involution('a a b b c c'); i
+            sage: f._is_curve_one_sided
+            False
+        
+            sage: f = Foliation('a a b b c c','moebius', [1, 2, 3]); f
             a a b b c c
             Moebius band
-            sage: f = Foliation(i, [1, 2, 3]); f
-            a a b b c c
-            Moebius band
-            Lengths: (1/12, 1/6, 1/4)
+            Lengths: {'a': 1/12, 'c': 1/4, 'b': 1/6}
             sage: f._divpoints
-            [[(0, (0, 0, 0, 0, 0)),
-              (1/12, (1, 0, 0, 0, 0)),
-                (1/6, (2, 0, 0, 0, 0)),
-                  (1/3, (2, 1, 0, 0, 0)),
-                    (1/2, (2, 2, 0, 0, 0)),
-                      (3/4, (2, 2, 1, 0, 0))],
-                       [(0, (0, 0, 0, 0, 1)), (1/2, (0, 0, 0, 1, 1))]]
-            sage: f._divvalues
             [[0, 1/12, 1/6, 1/3, 1/2, 3/4], [0, 1/2]]
             sage: f._lengths['a']
-            (1/12, (1, 0, 0, 0, 0))
+            1/12
             sage: f._lengths['b']
-            (1/6, (0, 1, 0, 0, 0))
+            1/6
             sage: f._lengths['c']
-            (1/4, (0, 0, 1, 0, 0))
+            1/4
             sage: f._twist
-            (0, (0, 0, 0, 0, 1))
-            sage: f._involution
+            0
+            sage: f._gen_perm
             a a b b c c
-            Moebius band
+            JOKER JOKER
+            sage: f._is_curve_one_sided
+            True
 
         """
-        self._tt = None # Train Track is created only when first used.
+        from bisect import bisect_left
 
         self._is_bottom_side_moebius = False
         if bottom_letters == 'moebius': # bottom side is Moebius
             bottom_letters = 'JOKER JOKER'
             self._is_bottom_side_moebius = True
-        self._init_gen_perm(top_letters, bottom_letters, flips)
-        
-        
-        from bisect import bisect_left
-        if not self.is_bottom_side_moebius():
-            if twist == None:
-                raise ValueError('The twist must be specified '
-                'unless the bottom side is a Moebius band.')
 
+        # initializing the permutation, self._gen_perm
+        self._init_gen_perm(top_labels, bottom_letters, flips)
+
+        # initializing the lengths, self._lengths
+        if lengths is None:
+            while True:
+                lengths = [random.uniform(EPSILON, 1.0)
+                           for i in range(len(self._labels))]
+                try:
+                    total = self._init_lengths(lengths)
+                    break
+                except ValueError:
+                    pass
+        else:
+            total = self._init_lengths(lengths)
+
+        # setting/normalizing twist
+        if twist is None:
+            twist = random.uniform(EPSILON, total)
+        if self.is_bottom_side_moebius():
+            twist = 0
+        twist /= total
+
+        # setting top divpoints, self._divpoints, the bottom is not
+        # yet twisted
+        self._divpoints = [[0], [0]]
+        for interval in self._all_intervals[TOP] + self._all_intervals[BOTTOM]:
+            self._divpoints[interval.side].append(self._divpoints[
+                interval.side][-1] + self._lengths[interval.label(self)])
+        for side in [TOP,BOTTOM]:
+            self._divpoints[side].pop()
+
+        preimage_of_zero = mod_one(-twist)
+        containing_int = bisect_left(self._divpoints[BOTTOM], 
+                                     preimage_of_zero) % len(self._divpoints[BOTTOM])
+
+        # reseting the permutation after normalizing the twist
+        self._init_gen_perm(self._gen_perm_list[TOP],
+                            self._gen_perm_list[BOTTOM][containing_int:]+
+                            self._gen_perm_list[BOTTOM][:containing_int], 
+                            flips = self._flips)
+        self._twist = mod_one(self._divpoints[BOTTOM][containing_int] -
+                preimage_of_zero)
+
+        # reseting the bottom divpoints now with the twist
+        self._divpoints[BOTTOM] = [self._twist]
+        for interval in self._all_intervals[BOTTOM][:-1]:
+            self._divpoints[1].append(self._divpoints[BOTTOM][-1] + 
+                                      interval.length(self))
+
+
+    def _init_gen_perm(self, top_labels, bottom_letters, flips):
+        """Initialize the permutation-related variables.
+
+        More precisely: _gen_perm, _gen_perm_list, _all_intervals,
+        _numerical_label, _pair. Other initializing methods depend on
+        these variables, therefore this one must be called first.
+
+        INPUT:
+
+        - ``top_labels``,``bottom_labels``,``flips`` -- as in the constructor
+
+        """
+        self._gen_perm = GeneralizedPermutation(\
+                        top_labels, bottom_letters, flips = flips)
+
+        # The permutation in list form. Access is faster.
+        self._gen_perm_list = self._gen_perm.list()
+
+        # Saving the set of labels.
+        self._labels = set(self._gen_perm.alphabet())
+        self._labels.discard('JOKER')
+        
+        # The list of flipped labels.
+        self._flips = self._gen_perm.flips() if \
+                      isinstance(self._gen_perm[0][0], tuple) else []
+        # In the first case, self._gen_perm is a FlippedLabelledPermutationLI
+        # that has a flips() method
+        # In the second case, self._gen_perm is a LabelledPermutationIET 
+        # that doesn't have a flips method, but then there are no
+        # flips, so we assign the empty list.
+
+        
+        # initializing self._numerical_label and self._pair
+        self._all_intervals = [[], []]
+        label_to_interval = {}
+        self._numerical_label = {}
+        count = 0
+        self._pair = {}
+        for side in {0, 1}:
+            for index in range(len(self._gen_perm_list[side])):
+                interval = Interval(side, index)
+                self._all_intervals[side].append(interval)
+                label = interval.label(self)
+                if label not in self._numerical_label:
+                    self._numerical_label[label] = count
+                    count += 1
+                    label_to_interval[label] = interval
+                else:
+                    self._pair[label_to_interval[label]] = interval
+                    self._pair[interval] = label_to_interval[label]
+            
+
+    def _init_lengths(self, lengths):
+        """
+        Initializes self._lengths.
+
+        Should only be used in the constructor of Foliation.
+
+        INPUT: 
+
+        - ``lengths`` -- either a list, tuple or dict or lengths. The
+          lengths have to be positive, but even then, after balancing
+          the lengths out, some lengths might turn into negative, in
+          which case a ValueError is raised.
+
+        """
         if isinstance(lengths, (list, tuple)):
-            if len(lengths) != len(self.alphabet()):
-                    raise ValueError('Bad number of lengths')
-            self._lengths = {label: lengths[self._index_of_label[label]] 
-                    for label in self.alphabet()}
-                        
-        if isinstance(lengths, dict):
-            if set(self.alphabet()) != set(lengths.keys()):
+            if len(lengths) != len(self._labels):
+                raise ValueError('Bad number of lengths')
+            self._lengths = {label: lengths[self._numerical_label[label]] 
+                    for label in self._labels}
+        elif isinstance(lengths, dict):
+            if set(self._labels) != set(lengths.keys()):
                 raise ValueError('Invalid length specification')     
             self._lengths = dict(lengths)
-
-        if any(v <= 0 for v in self._lengths.values()):
-            raise ValueError('Lengths must be positive')
-
+        else:
+            TypeError('The ``lengths`` argument should be a list, tuple'
+                       'or dict')
+            
         if self.is_bottom_side_moebius():
             self._lengths['JOKER'] = sum(self._lengths.values())
-            twist = 0
 
         totals = [sum(interval.length(self) for interval in 
                       self._all_intervals[side]) for side in [0,1]]
 
-        
         #adjusting lengths in case they 
         #differ on top/bottom
         for interval in self._all_intervals[0]:
@@ -280,64 +369,24 @@ class Foliation(SageObject):
                         (totals[1] - totals[0])/2
                 break
 
-        totals = [sum(interval.length(self) for interval in 
-                      self._all_intervals[side]) for side in [0,1]]
-
-        if abs(totals[0] - totals[1]) > epsilon:
-            print lengths
-            print self._lengths
-            print totals[0], totals[1], abs(totals[0] - totals[1])
-            print top_letters
-            print bottom_letters
-            raise ValueError('The total length on the top and '
-                    'bottom are inconsistent.')
-
-
+        if any(v <= 0 for v in self._lengths.values()):            
+            raise ValueError('Corrected lengths are not positive')
+        
         for label in self._lengths:
             self._lengths[label] /= totals[1]
-        self._divvalues = [[0], [0]]
 
-        for interval in self._all_intervals[0] + self._all_intervals[1]:
-            self._divvalues[interval.side].append(self._divvalues[
-                interval.side][-1] + self._lengths[interval.label(self)])
-        for side in {0,1}:
-            self._divvalues[side].pop()
-
-        preimage_of_zero = mod_one(-twist/totals[1])
-        containing_int = bisect_left(self._divvalues[1], 
-                preimage_of_zero) % self.num_intervals(1)
-        
-        self._init_gen_perm(self._gen_perm_list[0],
-                            self._gen_perm_list[1][containing_int:]+
-                            self._gen_perm_list[1][:containing_int], 
-                            flips = self.flips())
-        self._twist = mod_one(self._divvalues[1][containing_int] -
-                preimage_of_zero)
-        self._divvalues[1] = [self._twist]
-        for interval in self._all_intervals[1][:-1]:
-            self._divvalues[1].append(self._divvalues[1][-1] + 
-                                      interval.length(self))
-        
-        self._length_twist_vector = [0] * len(self._lengths)
-        self._length_twist_vector.append(self._twist)
-        for label in self._lengths:
-            self._length_twist_vector[self.index_of_label(label)]\
-                    = self._lengths[label]
-        self._length_twist_vector = vector(self._length_twist_vector)
+        return totals[1]
 
 
     def _init_singularity_partition(self):
-        # initializing self._singularity_partition
-        tt = self.train_track
+        """Initialize self._singularity_partition. """
         done = set()
         partition = []
-        edge_circles = []
         for interval in self.intervals():
             if interval in done:
                 continue
             new_interval = interval
             partition.append([])
-            edge_circles.append([])
             end = 0 # we start from the left side of the interval
             while True:
                 sing_index = new_interval if end == 0 else new_interval.next(self)
@@ -345,109 +394,526 @@ class Foliation(SageObject):
                     break
                 done.add(sing_index)
                 partition[-1].append(sing_index)
-                edge_circles[-1].append(tt.get_center_edge(new_interval, end))
                 end = (end + 1) % 2
                 new_interval = new_interval.add_to_position((-1)**end, self)
-                edge_circles[-1].append(tt.get_center_edge(new_interval, end).reversed())
-                edge_circles[-1].append(tt.get_oriented_edge(new_interval,
-                                                new_interval.pair(self), 'pair'))
                 new_interval = new_interval.pair(self)
                 if new_interval.is_flipped(self):
                     end = (end + 1) % 2
                 
         self._singularity_partition = partition
-        self._paths_around_singularities = edge_circles
-        
-    @property
-    def paths_around_singularities(self):
-        if not hasattr(self, '_paths_around_singularities'):
-            self._init_singularity_partition()
-        return self._paths_around_singularities
 
-    def _init_gen_perm(self, top_letters, bottom_letters, flips):
-        self._gen_perm = GeneralizedPermutation(\
-                        top_letters, bottom_letters, flips = flips)
-        self._gen_perm_list = self._gen_perm.list()
-
-        # initializing self._index_of_label and self._pair
-        self._all_intervals = [[], []]
-        label_to_interval = {}
-        self._index_of_label = {}
-        count = 0
-        self._pair = {}
-        for side in {0, 1}:
-            for index in range(len(self._gen_perm_list[side])):
-                interval = Interval(side, index)
-                self._all_intervals[side].append(interval)
-                label = interval.label(self)
-                if label not in self._index_of_label:
-                    self._index_of_label[label] = count
-                    count += 1
-                    label_to_interval[label] = interval
-                else:
-                    self._pair[label_to_interval[label]] = interval
-                    self._pair[interval] = label_to_interval[label]
-
-
+    
     def permutation(self):
+        """Return the permutation of the interval exchange.
+
+        OUTPUT:
+
+        a iet.GeneralizedPermutation object
+
+        EXAMPLES::
+
+        sage: f = Foliation('a a b b', 'c c', [1, 2, 3])
+        sage: f.permutation()
+        a a b b
+        c c
+
+        sage: f = Foliation('a a b b c c','moebius',flips='abc')
+        sage: f.permutation()
+        -a -a -b -b -c -c
+         JOKER  JOKER
+        
+        """
         return self._gen_perm
 
     def intervals(self):
+        """Return the list of intervals.
+
+        This method is useful for iterating through the intervals of
+        the foliation. The intervals are repserented as Interval
+        objects with a range of convenient properties.
+
+        OUTPUT:
+
+        a list of ``Interval`` objects ordered as top intervals first,
+        from left to right, then (if the bottom side is not a Moebius
+        band) bottom intervals from left to
+        right.
+
+        EXAMPLES::
+
+        sage: f = Foliation('a a b b', 'c c', [1, 2, 3])
+        sage: f.intervals()
+        [(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1)]
+
+        sage: f = Foliation('a a b b c c','moebius',flips='abc')
+        sage: f.intervals()
+        [(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)]
+        
+        """
         if self.is_bottom_side_moebius():
             return self._all_intervals[0]
         return self._all_intervals[0] + self._all_intervals[1]
 
-    # def interval(self, side, index):
-    #     return self._all_intervals[side][index]
 
-    def num_intervals(self, side):
-        return len(self._gen_perm_list[side])
+    def is_orientable(self, foliation_or_surface):
 
-    def labels(self):
-        return self._gen_perm_list
-
-    def length_of_label(self, label):
-        return self._lengths[label]
-
-    @property
-    def train_track(self):
-        from train_track import TrainTrack
-        if not isinstance(self._tt, TrainTrack):
-            self._tt = TrainTrack(self)
-        return self._tt
-
-    def index_of_label(self, label):
         """
-        Returns the index of an letter.
-
-        If n letters are used to notate the involution, they
-        are indexed from 0 to n-1 according to their first 
-        occurrence when read from to to bottom, from left to
-        right.
+        Test orientability of the foliation or surface.
 
         INPUT:
 
-        - ``letter`` - string
+        - ``foliation_or_surface`` -- either 'foliation' or 'surface',
+          depending on the orientability of the foliation or the
+          surface is tested
 
         OUTPUT:
 
-        - integer - the index of the letter
+        True or False
+
+        EXAMPLES:
+
+        The foliation is orientable iff there are no flips::
+
+            sage: f = Foliation('a a b b', 'c c', [1,2,3], flips ='a',
+            twist = 1)
+            sage: f.is_orientable('foliation')
+            False
+
+            sage: g = Foliation('a a b b', 'c c', [1,2,3], twist = 1)
+            sage: g.is_orientable('foliation')
+            True
+
+
+        If the bottom side is a Moebius band, the surface is automatically
+        non-orientable::
+
+            sage: f = Foliation('a a b b','moebius',[1,2])
+            sage: f.is_orientable('surface')
+            False
+
+        Also if there is flipped pair on different sides::
+
+            sage: f = Foliation('a b c','c b a',[1,2,3], flips = 'a', twist=1)
+            sage: f.is_orientable('surface')
+            False
+
+        Or if there is not flipped pair on the same side::
+
+            sage: f = Foliation('a a b b', 'c c', [1,2,3],flips='ac',twist=1)
+            sage: f.is_orientable('surface')
+            False
+
+        Otherwise it is orientable::
+
+            sage: f = Foliation('a b c', 'b c a',[1,2,3],twist=1)
+            sage: f.is_orientable('surface')
+            True
+
+        """
+        if foliation_or_surface == 'foliation':
+            return len(self._flips) == 0
+        if foliation_or_surface == 'surface':
+            # including the JOKER JOKER pair if the bottom side is Moebius 
+            return all(not interval.is_orientation_reversing(self)
+                       for x in self._all_intervals for interval in x)
+
+
+    def num_intervals(self, side):
+        """Return the number of intervals on the specified side.
+
+        INPUT:
+
+        - ``side`` -- (0=TOP or 1=BOTTOM) 
+
+        OUTPUT:
+
+        the number of intervals on the specified side.
 
         EXAMPLES::
 
-            sage: i = Involution('a b a c','d c d b')
-            sage: i.index('a')
-            0
-            sage: i.index('b')
-            1
-            sage: i.index('c')
-            2
-            sage: i.index('d')
-            3
+        sage: f = Foliation('a a b b', 'c c', [1, 2, 3])
+        sage: f.num_intervals(TOP)
+        4
+        sage: f.num_intervals(BOTTOM)
+        2
+
+        sage: f = Foliation('a a b b c c','moebius',flips='abc')
+        sage: f.num_intervals(TOP)
+        6
+        sage: f.num_intervals(BOTTOM)
+        0
 
         """
-        return self._index_of_label[label]
+        if self.is_bottom_side_moebius() and side == BOTTOM:
+            return 0
+        return len(self._all_intervals[side])
 
+    def train_track(self):
+        """Return the canonical train track carrying the foliation.
+
+        OUTPUT:
+
+        The ``TrainTrack`` carrying the foliation.  If there is a
+        saddle connection, the train track cannot be constructed, and
+        SaddleConnectionError is raised.
+
+        EXAMPLES::
+
+        sage: f = Foliation('a a b b', 'c c', [1, 2, 3])
+        sage: tt = f.train_track()
+
+        """
+        from train_track import TrainTrack
+        if not hasattr(self, '_tt'):
+            self._tt = TrainTrack(self)
+        return self._tt
+
+
+    def is_bottom_side_moebius(self):
+        """
+        Decides if the bottom side is Moebius band without
+        punctures.
+
+        This happens exactly when the second argument in
+        the constructor is 'moebius', or in other words when the
+        transverse curve `\gamma` is one-sided.
+
+        OUTPUT:
+
+        True or False
+
+        EXAMPLES::
+
+            sage: f = Foliation('a a b b','moebius',[1,2])
+            sage: f.is_bottom_side_moebius()
+            True
+
+        Here the bottom component is a once punctured Moebius
+        band, so it returns False::
+
+            sage: f = Foliation('a a b b', 'c c',[1,2,3],twist=1)
+            sage: f.is_bottom_side_moebius()
+            False
+        """
+        return self._is_bottom_side_moebius
+
+
+    def __eq__(self, other):
+        r"""
+        Tests exact equality.
+
+        TESTS::
+
+        sage: f = Foliation('a a b b c c','moebius',[1,2,3])
+        sage: g = Foliation('1 1 2 2 3 3','moebius',[2.0000001,4,6])
+        sage: h = Foliation('1 1 2 2 3 3','moebius',[2,4,6])
+        sage: f == g
+        False
+        sage: f == h
+        True
+        
+        """
+        return self.equals(other,0)
+                
+    
+    def equals(self, other, allowed_error = EPSILON):
+        """Test approximate equality of two foliations.
+
+        For the two foliations to be considered equal, the permutation
+        of intervals has to be the same (but possibly with different
+        labels). Also the vectors made from the length and twists
+        parameters must differ by less than ``allowed_error``.
+
+        INPUT:
+
+        - ``other`` -- another ``Foliation`` object
+
+        - ``allowed_error`` -- a positive number, the distance between
+        the two length-twist vectors must be smaller than this in
+        order for equality.
+        
+        EXAMPLES::
+
+        sage: f = Foliation('a a b b c c','moebius',[1,2,3])
+        sage: g = Foliation('1 1 2 2 3 3','moebius',[2.0000001,4,6])
+        sage: f.equals(g,0.0001)
+        True
+
+        """
+        return self.is_bottom_side_moebius() == other.is_bottom_side_moebius()\
+                and self._gen_perm == other._gen_perm and \
+                abs(vector(flatten(self._divpoints)) -
+                vector(flatten(other._divpoints))) <= allowed_error
+        
+    def _repr_(self):
+        r"""
+        Return a representation of self.
+
+        TESTS::
+
+        sage: Foliation('a b c', 'a c b', [1, 2, 3], twist=1)
+        a b c
+        a c b
+        Lengths: {'a': 1/6, 'c': 1/2, 'b': 1/3}
+        Twist: 1/6
+
+        sage: Foliation('a a b b c c','moebius', [2, 2, 1])
+        a a b b c c
+        Moebius band
+        Lengths: {'a': 1/5, 'c': 1/10, 'b': 1/5}
+
+        """
+        if self.is_bottom_side_moebius():
+            d = dict(self._lengths)
+            del d['JOKER']
+            return "{0}\nLengths: {1}".format(\
+                repr(self._gen_perm).split('\n')[0] + '\nMoebius band', d)
+        return "{0}\nLengths: {1}\nTwist: {2}".format(repr(self._gen_perm),
+                self._lengths, self._twist)
+
+    def _latex_(self):
+        """Return a TikZ representation of the Foliation.
+
+        OUTPUT:
+
+        string, the TikZ representation of the Foliation.
+
+        EXAMPLES::
+
+        sage: f = Foliation('a a b b c c','moebius', [0.12312,0.531354,0.5134])
+        sage: latex(f) #indirect doctest
+        '...tikzpicture...'
+
+        """
+        return self.latex_options().tikz_picture()
+
+    def latex_options(self):
+        """Return the LaTeX options for the TikZ representation of
+        self.
+
+        OUTPUT:
+
+        a ``FoliationLatex`` object, storing the set LaTeX options.
+
+        EXAMPLES:
+
+        Only non-default options are listed, so initially nothing is printed::
+        
+        sage: f = Foliation('a a b b c c','moebius', [0.12312,0.531354,0.5134])
+        sage: f.latex_options()
+        {}
+
+        One can custom drawing options::
+
+        sage: f = Foliation('a a b b c c','moebius', [0.12312,0.531354,0.5134])
+        sage: f.set_latex_options(scale=10, interval_labelling=False)
+        sage: f.latex_options()
+        {'scale': 10, 'interval_labelling': False}
+
+        """
+        if not hasattr(self, '_latex_opts'):
+            from foliation_latex import FoliationLatex
+            self._latex_opts = FoliationLatex(self)
+        return self._latex_opts
+
+    def set_latex_options(self, **kwds):
+        """Set LaTeX options.
+        
+        INPUT:
+
+        - ``**kwds`` -- options to be set
+
+        EXAMPLES::
+
+        sage: f = Foliation('a a b b c c','moebius', [0.12312,0.531354,0.5134])
+        sage: f.set_latex_options(scale=10, interval_labelling=False)
+        sage: f.latex_options()
+        {'scale': 10, 'interval_labelling': False}
+
+        """
+        opts = self.latex_options()
+        opts.set_options(**kwds)
+
+    def singularity_partition(self):
+        """
+        Return the singularity partition of the ``Foliation``.
+
+        OUTPUT:
+
+        - list of lists - each element of the list is a list corresponding to
+          a singularity, and each such list contains the
+          ``Interval``s whose left endpoint lies in a separatrix
+          emanating from that singularity.
+
+        EXAMPLES::
+
+            sage: f = Foliation('a a b b c c','moebius')
+            sage: sp = f.singularity_partition()
+            sage: len(sp)
+            1
+            sage: set(sp[0]) == {(0,2), (0,3), (0, 4), (0, 5), (0, 0), (0, 1)}
+            True
+
+            sage: f = Foliation('a b c d', 'b a d c', flips = 'ac')
+            sage: sp = f.singularity_partition()
+            sage: len(sp)
+            2
+            sage: set(sp[0]) == {(1, 1), (0, 2), (1, 0), (0, 1)}
+            True
+            sage: set(sp[1]) == {(0, 0), (1, 3), (0, 3), (1, 2)}
+            True
+
+        """
+        if not hasattr(self, '_singularity_partition'):
+            self._init_singularity_partition()
+
+        return list(self._singularity_partition)
+
+    def singularity_type(self):
+        """
+        Return the singularity type of the ``Foliation``.
+
+        OUTPUT:
+
+        a tuple of the number of prongs of the singularities, in
+        decreasing order.
+
+        EXAMPLES::
+
+            sage: f = Foliation('a a b b c c', flips = 'abc')
+            sage: f.singularity_type()
+            (3, 1, 1, 1)
+
+            sage: f = Foliation('a a b b c c', 'd d', flips = 'abc')
+            sage: f.singularity_type()
+            (3, 2, 1, 1, 1)
+
+        Finally, a once and twice punctured torus::
+
+            sage: f = Foliation('a', 'a')
+            sage: f.singularity_type()
+            (2,)
+
+            sage: f = Foliation('a b', 'a b')
+            sage: f.singularity_type()
+            (2, 2)
+
+        """
+        t = sorted([x for x in map(len, self.singularity_partition())],
+                   reverse = True)
+        return tuple(t)
+
+    def euler_char(self):
+        """Return the Euler characteristic of the closed surface.
+        
+        OUTPUT:
+
+        an integer, the Euler characteristic
+
+        EXAMPLES::
+
+            sage: f = Foliation('a a b b c c','moebius',[0.12,0.45,0.63],flips = 'abc')
+            sage: f.euler_char()
+            -2
+
+            sage: f = Foliation('a a b b c c', 'd d', flips = 'abc')
+            sage: f.singularity_type()
+            (3, 2, 1, 1, 1)
+
+        A once punctured torus::
+
+            sage: f = Foliation('a', 'a')
+            sage: f.euler_char()
+            0
+        """
+        ec = 0
+        for p in self.singularity_type():
+            ec += 2-p
+        return ec/2
+
+    def genus(self):
+        """Return the genus of the surface.
+
+        In the orientable case the genus of the number of tori in a
+        connected sum representation, while in the non-orientable case
+        it is the number of projective planes.
+
+        OUTPUT:
+
+        a non-negative integer, the genus of the surface
+
+        EXAMPLES::
+
+        """
+        ec = self.euler_char()
+        if self.is_orientable('surface'):
+            return 1 - ec/2
+        return 2 - ec
+
+    def num_punctures(self):
+        """Return the number of punctures.
+
+        By convention, the surface is considered punctured at the 1-
+        and 2-pronged singularities, but not at the others.
+
+        OUTPUT:
+        
+        a non-negative integer, the number of punctures
+
+        EXAMPLES::
+        
+        """
+        return len([x for x in self.singularity_type() if x <= 2])
+
+    def surface_type(self):
+        """Return the surface type.
+
+        Let `S_{g,n}` and `N_{g,n}` denote the orientable and
+        nonorientable surface with genus `g` and `n` punctures,
+        respectively. In the case `n=0` we will simply say `S_g` and `N_g`.
+
+        OUTPUT:
+
+        a string, the surface type
+
+        EXAMPLES::
+
+        """
+        stem = 'S_' if self.is_orientable('surface') else 'N_'
+        g = self.genus()
+        n = self.num_punctures()
+        if n == 0:
+            return stem + str(g)
+        return '{0}{{{g},{n}}}'.format(stem, g=g, n=n)
+
+
+    
+    def with_changed_lengths(self, length_vector = None):
+
+        """Define a new Foliation with different length parameters.
+
+        INPUT:
+
+        - ``length_vector`` -- 
+
+
+        """
+        if self.is_bottom_side_moebius():
+            return Foliation(self._gen_perm_list[0], 'moebius', length_vector,
+                             flips = self._flips)
+        if length_vector is None:
+            lengths = None
+            twist = None
+        else:
+            lengths = length_vector[:-1]
+            twist = length_vector[-1]
+        return Foliation(self._gen_perm_list[0], self._gen_perm_list[1],
+                         lengths, flips = self._flips,
+                         twist = twist)
+
+
+
+    
     def raw_to_adj(self, raw_x):
         return mod_one(2 * raw_x) if self.is_bottom_side_moebius() else raw_x
 
@@ -463,320 +929,16 @@ class Foliation(SageObject):
 
 
 
-    def is_bottom_side_moebius(self):
-        """
-        Decides if the bottom side is Moebius band without
-        punctures.
-
-        This happends exactly when the second argument in
-        the constructor is omitted.
-
-        OUTPUT:
-
-        - boolean
-
-        EXAMPLES::
-
-            sage: i = Involution('a a b b')
-            sage: i.is_bottom_side_moebius()
-            True
-
-        Here the bottom component is a once punctured Moebius
-        band, so it returns False::
-
-            sage: i = Involution('a a b b', 'c c')
-            sage: i.is_bottom_side_moebius()
-            False
-
-        """
-        return self._is_bottom_side_moebius
 
 
-    def flips(self):
-        """
-        Returns the list of flips.
-
-        OUTPUT:
-
-        - list -- the list of flipped interval names
-
-        EXMAPLES::
-
-            sage: i = Involution('a a b b','c c',flips = 'ab')
-            sage: i.flips()
-            ['a', 'b']
-
-            sage: i = Involution('a a', flips = 'a')
-            sage: i.flips()
-            ['a']
-
-        """
-        if isinstance(self._gen_perm[0][0], tuple):
-            # self._gen_perm is a FlippedLabelledPermutationLI
-            # that has a flips() method
-            return self._gen_perm.flips()
-        else: #self._gen_perm is a LabelledPermutationIET 
-            # hence there are no flips
-            return []
-
-    def alphabet(self):
-        """
-        Returns the set of interval names.
-
-        OUTPUT:
-
-        set -- the set of interval names
-
-        EXAMPLES::
-
-            sage: i = Involution('a a b b','c c',flips='c')
-            sage: i.alphabet() == {'a', 'b', 'c'}
-            True
-
-        """
-        s = set(self._gen_perm.alphabet())
-        s.discard('JOKER')
-        return s
-
-    def is_orientable(self, foliation_or_surface):
-        """
-        Decides if the suspension foliations are orientable.
-
-        OUTPUT:
-
-        - boolean --
-
-        EXAMPLES:
-
-        If there are flipped intervals, the foliation is 
-        non-orientable::
-
-            sage: i = Involution('a a b b', 'c c', flips ='a')
-            sage: i.is_foliation_orientable()
-            False
-
-        If there are no flips, the foliation is orientable::
-
-            sage: i = Involution('a a b b', 'c c')
-            sage: i.is_foliation_orientable()
-            True
-
-        Decides if the suspension surface is orientable.
-
-        OUTPUT:
-
-        - boolean -- 
-
-        EXAMPLES:
-
-        If the bottom side is a Moebius band, it is always
-        non-orientable::
-
-            sage: i = Involution('a a b b')
-            sage: i.is_surface_orientable()
-            False
-
-        Or if there is flipped pair on different sides::
-
-            sage: i = Involution('a b c','c b a', flips = 'a')
-            sage: i.is_surface_orientable()
-            False
-
-        Or if there is not flipped pair on the same side::
-
-            sage: i = Involution('a a b b', 'c c', flips='ac')
-            sage: i.is_surface_orientable()
-            False
-
-        Otherwise it is orientable::
-
-            sage: i = Involution('a b c', 'b c a')
-            sage: i.is_surface_orientable()
-            True
-
-        """
-        if foliation_or_surface == 'foliation':
-            return len(self.flips()) == 0
-        if foliation_or_surface == 'surface':
-            return all(not Interval(side, pos).is_orientation_reversing(self)
-                       for side in range(2)
-                       for pos in self.num_intervals(side))
-            # including the Moebius side as well
+    
 
 
-    def singularity_partition(self):
-        """
-        Returns the singularity partition of self.
 
-        OUTPUT:
-
-        - list of lists - each element of the list is a list corresponding to
-          a singularity, and each such list contains the tuples of positions
-          that are being identified
-
-        EXAMPLES::
-
-            sage: i = Involution('a a b b c c')
-            sage: sp = i.singularity_partition()
-            sage: len(sp) == 1
-            True
-            sage: set(sp[0]) == {(0,2), (0,3), (0, 4), (0, 5), (0, 0), (0, 1)}
-            True
-
-            sage: i = Involution('a b c d', 'b a d c', flips = 'ac')
-            sage: sp = i.singularity_partition()
-            sage: len(sp) == 2
-            True
-            sage: set(sp[0]) == {(1, 1), (0, 2), (1, 0), (0, 1)}
-            True
-            sage: set(sp[1]) == {(0, 0), (1, 3), (0, 3), (1, 2)}
-            True
-
-        """
-        if not hasattr(self, '_singularity_partition'):
-            self._init_singularity_partition()
-
-        return list(self._singularity_partition)
-
-         
-    def singularity_type(self):
-        """
-        Returns the singularity type of self.
-
-        The suspension of the Involution yields a foliation.
-        The singularity type of that foliation is the tuple of
-        the number of prongs at singularities.
-
-        OUTPUT:
-
-        - tuple -
-
-        EXAMPLES::
-
-            sage: i = Involution('a a b b c c', flips = 'abc'); i
-            -a -a -b -b -c -c
-            Moebius band
-            sage: i.singularity_type()
-            (3, 1, 1, 1)
-
-            sage: i = Involution('a a b b c c', 'd d', flips = 'abc'); i
-            -a -a -b -b -c -c
-             d  d
-            sage: i.singularity_type()
-            (3, 2, 1, 1, 1)
-
-            sage: i = Involution('a', 'a'); i
-            a
-            a
-            sage: i.singularity_type()
-            (2,)
-
-            sage: i = Involution('a b', 'a b'); i
-            a b 
-            a b
-            sage: i.singularity_type()
-            (2, 2)
-
-        """
-        t = sorted([x for x in map(len, 
-            self._singularity_partition)], reverse = True)
-        return tuple(t)
-
-    @property
-    def divvalues(self):
-        return self._divvalues
 
         
-    def with_changed_lengths(self, length_vector = None):
-        import random
-        if length_vector == None: # randomize lengths
-            n = len(self.alphabet())
-            if not self.is_bottom_side_moebius():
-                n += 1 # the twist
-            length_vector = [random.uniform(epsilon, 1.0) for i in range(n)]
-        if self.is_bottom_side_moebius():
-            return Foliation(self._gen_perm_list[0], 'moebius', length_vector,
-                             flips = self.flips())
-        return Foliation(self._gen_perm_list[0], self._gen_perm_list[1],
-                         length_vector[:-1], flips = self.flips(),
-                         twist = length_vector[-1])
-
-
-    def __eq__(self, other):
-        r"""
-        Tests approximate equality.
-
-        The involutions have to equal up to different labelling, but the
-        length and twist parameters are enough to be very close for the
-        equality of Foliations.
-
-        EXAMPLES::
-
-            sage: i = Involution('a a b b', 'c c')
-            sage: f = Foliation(i, [1, 2, 3], 1/2); f
-            a a b b
-            c c
-            Lengths: (1/6, 1/3, 1/2)
-            Twist: 1/12
-
-            sage: j = Involution('1 1 2 2', '3 3')
-            sage: g = Foliation(j, [1, 2, 3.000000000001], 1/2); g
-            1 1 2 2
-            3 3
-            Lengths: (0.166666666666611, 0.333333333333222, 0.500000000000167)
-            Twist: 0.0833333333333055
-
-            sage: f == g
-            True
-
-        """
-        return self.equals(other, epsilon)
-
-    def equals(self, other, allowed_error):
-        return self.is_bottom_side_moebius() == other.is_bottom_side_moebius()\
-                and self._gen_perm == other._gen_perm and \
-                abs(self._length_twist_vector -
-                    other._length_twist_vector) < allowed_error
         
-
-    def _repr_(self):
-        r"""
-        Returns a representation of self.
-
-        TESTS::
-
-            sage: Foliation(Involution('a b c', 'a c b'), [1, 2, 3], 1)
-            a b c
-            a c b
-            Lengths: (1/6, 1/3, 1/2)
-            Twist: 1/6
-
-            sage: Foliation(Involution('a a b b c c'), [2, 2, 1])
-            a a b b c c
-            Moebius band
-            Lengths: (1/5, 1/5, 1/10)
-
-        """
-        if self.is_bottom_side_moebius():
-            d = dict(self._lengths)
-            del d['JOKER']
-            return "{0}\nLengths: {1}".format(\
-                repr(self._gen_perm).split('\n')[0] + '\nMoebius band', d)
-        return "{0}\nLengths: {1}\nTwist: {2}".format(repr(self._gen_perm),
-                self._lengths, self._twist)
-
-    def _latex_(self):
-        return self.latex_options().tikz_picture()
-
-    def latex_options(self):
-        if not hasattr(self, '_latex_opts'):
-            from foliation_latex import FoliationLatex
-            self._latex_opts = FoliationLatex(self)
-        return self._latex_opts
-
-    def set_latex_options(self, **kwds):
-        opts = self.latex_options()
-        opts.set_options(**kwds)
+        
 
                 
 
@@ -827,20 +989,20 @@ class Foliation(SageObject):
         from bisect import bisect
         raw_point = self.adj_to_raw(point, side)
         raw_side = 0 if self.is_bottom_side_moebius() else side
-        interval = bisect(self._divvalues[raw_side], raw_point)
+        interval = bisect(self._divpoints[raw_side], raw_point)
 
         if interval == 0:
-            to_check = {self._divvalues[raw_side][0]}
-        elif interval == len(self._divvalues[raw_side]):
-            to_check = {self._divvalues[raw_side][interval - 1],
-                    self._divvalues[raw_side][0] + 1}
+            to_check = {self._divpoints[raw_side][0]}
+        elif interval == len(self._divpoints[raw_side]):
+            to_check = {self._divpoints[raw_side][interval - 1],
+                    self._divpoints[raw_side][0] + 1}
         else:
-            to_check = {self._divvalues[raw_side][k]
+            to_check = {self._divpoints[raw_side][k]
                     for k in {interval - 1, interval}}
 
-        if any(abs(raw_point - x) < epsilon for x in to_check):
+        if any(abs(raw_point - x) < EPSILON for x in to_check):
             # print self
-            # print self._divvalues
+            # print self._divpoints
             # print side, point
             # print raw_side, raw_point
             # print to_check
@@ -950,13 +1112,15 @@ class Foliation(SageObject):
         
 
     def double_cover(self, foliation_or_surface):
-        """
-        Returns the orienting double cover of the foliation.
+        """Return an orienting double cover of the foliation.
 
-        If the foliation is already orientable (i.e. the surface
-        is orientable and the holonomy is trivial, or the surface
-        is non-orientable and the holonomy is Z_2, or equivalently
-        no interval is flipped), then there is nothing to do.
+        There are two types of orientation double covers. The first is
+        the one that orients the surface, the second orients the
+        foliation.
+
+        Let's start with the orientation cover of the foliation.  If
+        the foliation is already orientable (i.e. no interval is
+        flipped), then there is nothing to do.
 
         So assume that it is not the case and there is at least one
         flipped pair of intervals. Our transverse curve has trivial
@@ -983,12 +1147,10 @@ class Foliation(SageObject):
         These endpoints are also new division points, so one has twice
         as many division points for the lift foliation as for the
         original one.
-
-        Returns the double cover of the foliation that orients the
-        surface.
-
+        
+        Now turn to the double cover that orients the surface.
         If the surface is already orientable, there is nothing to do.
-        If not, then the our transverse curve, which separates the
+        If not, then our transverse curve, which separates the
         non-orientable surface to a Moebius band and another surface
         has two lifts. The Moebius band lifts to an annulus bounded
         by these two lifts. 
@@ -996,19 +1158,19 @@ class Foliation(SageObject):
         If the other surface is orientable (i.e.
         all intervals are flipped),
         it has two lifts homeomorphic to itself, and they are
-        glued to the two sides of the annulus. The folition inside
+        glued to the two sides of the annulus. The foliation inside
         the annulus has the effect of a twist of 1/2 between the 
         surfaces on the two sides. All pairs of intervals remain
         flipped.
 
         If the complement of the Mobius band is non-orientable (i.e.
-        there is at least one interval which is not twisted), then
-        its double cover has one components with two bounding circles
+        there is at least one interval which is not flipped), then
+        its double cover has one component with two bounding circles
         that are glued to the two boundary circles of the annulus.
         Arcs that were flipped stay flipped and will appear
         on both sides of the transverse curve. Arcs that were
         not flipped will turn into a pair of intervals on different
-        sided, still not flipped (i.e. strips connecting 
+        sides, still not flipped (i.e. strips connecting 
         different sides of the annulus).
 
         In any case, one only has to change the interval pairings for
@@ -1032,6 +1194,7 @@ class Foliation(SageObject):
             sage: g = Foliation.orientable_arnoux_yoccoz(9)
             sage: f.surface_orientable_double_cover() == g
             True
+
         """
         
         if self.is_orientable(foliation_or_surface):

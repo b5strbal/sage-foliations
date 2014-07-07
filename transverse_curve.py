@@ -26,9 +26,8 @@ from separatrix import Separatrix
 from arc import Arc
 from collections import namedtuple
 from sage.structure.sage_object import SageObject
-from constants import *
 from interval import Interval
-from myexceptions import RestrictionError, SaddleConnectionError
+from base import RestrictionError, SaddleConnectionError, LEFT, RIGHT
 
 
 Coding = namedtuple("Coding", "side, index, end, num_flips1, num_flips2")

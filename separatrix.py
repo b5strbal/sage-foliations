@@ -21,9 +21,8 @@ EXAMPLES::
 #*****************************************************************************
 
 from sage.structure.sage_object import SageObject
-from mymath import mod_one
 from train_track import TrainTrackPath
-from constants import *
+from base import LEFT
 
 class Separatrix(SageObject):
     def __init__(self, foliation, interval, end = 0, bounding_arc = None,
@@ -53,7 +52,7 @@ class Separatrix(SageObject):
 
         """
         self._foliation = foliation
-        self._tt = foliation.train_track
+        self._tt = foliation.train_track()
         assert(not self._foliation.is_bottom_side_moebius() or 
                 interval.side == 0) # otherwise it is not a real separatrix
         self._flip_count = 0

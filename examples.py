@@ -29,7 +29,7 @@ from sage.rings.real_double import RDF
 from sage.rings.polynomial.polynomial_ring_constructor import \
     PolynomialRing
 from pseudo_anosov import PseudoAnosov
-from constants import *
+from base import *
 # charpoly: x^6-x^5-kx^3-x-1
 # f = Foliation('1 2 3 4 5 6','5 2 1 4 3 6',[0.170886909342, 0.189075941817, 0.108600690819, 0.0879378482553, 0.0369647624731, 0.406533847294], twist = 0.0914086480774)
 
@@ -145,13 +145,13 @@ def family_A_PA(n, k, is_orientable):
         b = 2*n-4 if k > 1 else 1
         coding_list = [RestrictionCoding(fol,Coding(0,0,0,0,0)),Coding(1,b,0,0,0),SymmetryCoding(Interval(0,1), RIGHT)]
 
-    tt_map = tt_map_from_codings(fol.train_track, coding_list)
+    tt_map = tt_map_from_codings(fol.train_track(), coding_list)
     # return (tt_map.domain, tt_map.codomain)
     return PseudoAnosov(tt_map)
 
 
 fol_min4 = Foliation('e e a b f f d b d c a c', 'moebius', (1, 0.5834783686864043, 0.8827306520664273, 0.6609925318901200, 1.406064340122059, 0.9293980281776905))
-tt_map = tt_map_from_codings(fol_min4.train_track,
+tt_map = tt_map_from_codings(fol_min4.train_track(),
                              [RestrictionCoding(fol_min4, Coding(0,3,1,0,0))])
 pa_min4 = PseudoAnosov(tt_map)
 
@@ -171,6 +171,6 @@ def family_A_PA_other(n, k, is_orientable):
         b = 2*n-4 if k > 1 else 1
         coding_list = [RestrictionCoding(fol,Coding(0,0,0,0,0)),Coding(1,b,0,0,0),SymmetryCoding(Interval(0,1), RIGHT)]
 
-    tt_map = tt_map_from_codings(fol.train_track, coding_list)
+    tt_map = tt_map_from_codings(fol.train_track(), coding_list)
     # return (tt_map.domain, tt_map.codomain)
     return PseudoAnosov(tt_map)

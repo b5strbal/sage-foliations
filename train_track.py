@@ -21,11 +21,10 @@ EXAMPLES::
 #*****************************************************************************
 
 from sage.structure.sage_object import SageObject
-from mymath import mod_one
 from collections import namedtuple
 from sage.matrix.constructor import matrix, vector
 from sage.rings.integer_ring import ZZ
-from constants import *
+from base import *
 from sage.misc.misc_c import prod
 
 
@@ -397,7 +396,67 @@ class TrainTrack(SageObject):
             return candidates[1]
             
         assert(False)
+        
+    def _get_chunk(self, interval, end):
+        fol = self.sample_fol()
+        l = [self.get_center_edge(interval, end)]
+        end = (end + 1) % 2
+        interval = interval.add_to_position((-1)**end, fol)
+        l.append(self.get_center_edge(interval, end).reversed())
+        other_int = interval.pair(fol)
+        l.append(self.get_oriented_edge(interval, other_int,
+        'pair'))
+        if other_int.is_flipped(fol):
+            end = (end + 1) % 2
+        return (l, end)
 
+    def _get_loop(self, intervals):
+        end = 0
+        loop = []
+        for interval in intervals:
+            chuck, end = self._get_chunk(interval, end) 
+            loop.extend(chuck)
+        return loop
+        
+    def paths_around_singularities(self):
+        """Return the train track paths around singularities.
+
+        OUTPUT:
+
+        a list of length the number of singularities, where each
+        element of this list is a list of ``OrientedEdge``s, going
+        around a singularity.
+
+        EXAMPLES::
+        
+        sage: f = Foliation('a a b b c c','moebius',[0.21,0.11,0.18],flips='abc')
+        sage: tt = f.train_track()
+        sage: tt.paths_around_singularities()
+        [[OrientedEdge(edge=((0, 0), (0, 2), 'center'), direction=1),
+        OrientedEdge(edge=((0, 2), (0, 5), 'center'), direction=1),
+        OrientedEdge(edge=((0, 4), (0, 5), 'pair'), direction=-1),
+        OrientedEdge(edge=((0, 4), (0, 0), 'center'), direction=1),
+        OrientedEdge(edge=((0, 3), (0, 0), 'center'), direction=-1),
+        OrientedEdge(edge=((0, 2), (0, 3), 'pair'), direction=-1),
+        OrientedEdge(edge=((0, 2), (0, 5), 'center'), direction=1),
+        OrientedEdge(edge=((0, 5), (0, 1), 'center'), direction=1),
+        OrientedEdge(edge=((0, 0), (0, 1), 'pair'), direction=-1)],
+        [OrientedEdge(edge=((0, 1), (0, 4), 'center'), direction=1),
+        OrientedEdge(edge=((0, 4), (0, 0), 'center'), direction=1),
+        OrientedEdge(edge=((0, 0), (0, 1), 'pair'), direction=1)],
+        [OrientedEdge(edge=((0, 3), (0, 0), 'center'), direction=1),
+        OrientedEdge(edge=((0, 0), (0, 2), 'center'), direction=1),
+        OrientedEdge(edge=((0, 2), (0, 3), 'pair'), direction=1)],
+        [OrientedEdge(edge=((0, 5), (0, 1), 'center'), direction=1),
+        OrientedEdge(edge=((0, 1), (0, 4), 'center'), direction=1),
+        OrientedEdge(edge=((0, 4), (0, 5), 'pair'), direction=1)]]
+        """
+        fol = self.sample_fol()
+        sp = fol.singularity_partition()
+        return [self._get_loop(sing) for sing in sp]
+                 
+                 
+        
     def path_to_vector(self, path, is_signed):
         result = [0] * len(self._index_to_edge)
         # print self._edge_to_index

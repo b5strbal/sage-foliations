@@ -80,7 +80,7 @@ class TrainTrackComplex(DiGraph):
 
     def build(self, stop_after_time = 10):
         import random, time
-        from myexceptions import SaddleConnectionError
+        from base import SaddleConnectionError
         start = time.time()
         total_count_at_start = len(self.edges())
         count = 0
@@ -146,7 +146,7 @@ class TrainTrackComplex(DiGraph):
 
 from examples import family_A_foliation
 f = family_A_foliation(3, 1, False)
-tt = f.train_track
+tt = f.train_track()
 ttc = TrainTrackComplex(tt)
 
 

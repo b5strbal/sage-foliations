@@ -24,7 +24,7 @@ from collections import namedtuple
 from pseudo_anosov import PseudoAnosov
 from foliation import SymmetryCoding
 from transverse_curve import RestrictionCoding, get_codings, TransverseCurve
-from myexceptions import RestrictionError, SaddleConnectionError
+from base import RestrictionError, SaddleConnectionError
 
 # ALLOWED_ERROR_OF_FOLIATIONS = 0.00001
 
@@ -50,7 +50,7 @@ def tt_map_from_codings_and_fol(start_fol, coding_list):
     from train_track_map import TrainTrackMap
     from foliation import SymmetryCoding
     from transverse_curve import RestrictionCoding, TransverseCurve
-    tt_map_so_far = start_fol.train_track.identity_map()
+    tt_map_so_far = start_fol.train_track().identity_map()
     fol = start_fol
     for coding in coding_list:
         if isinstance(coding, SymmetryCoding):
@@ -93,12 +93,11 @@ def find_pseudo_anosov_candidates(foliation, depth,
                                   tt_map_so_far = None,
                                   coding_so_far = None):
     from train_track import TrainTrack
-    from mymath import NoPFEigenvectorError, pf_eigen_data
     from sage.rings.real_double import RDF
     # from foliation import SaddleConnectionError
 
     if tt_map_so_far == None:
-        tt_map_so_far = foliation.train_track.identity_map()
+        tt_map_so_far = foliation.train_track().identity_map()
         coding_so_far = []
 
     result = []
@@ -118,12 +117,17 @@ def find_pseudo_anosov_candidates(foliation, depth,
 
                 # BUG: this is buggy when the twist is longer than
                 # the first interval
-                m = final_tt_map.small_matrix().transpose()
-                try:
-                    eigenvalue, eigenvector = pf_eigen_data(m, RDF)
-                except NoPFEigenvectorError as ex:
-                    # print "No PF Eigendata: ", ex
+                if final_tt_map.is_pseudo_anosov():
+                    lengths = final_tt_map.get_PF_interval_lengths(RDF)
+                else:
                     continue
+
+                # m = final_tt_map.small_matrix().transpose()
+                # try:
+                #     eigenvalue, eigenvector = pf_eigen_data(m, RDF)
+                # except NoPFEigenvectorError as ex:
+                #     # print "No PF Eigendata: ", ex
+                #     continue
                 # if final_tt_map.is_pseudo_anosov():
                 
                 # print "Charpoly:", m.charpoly().factor()
@@ -133,7 +137,7 @@ def find_pseudo_anosov_candidates(foliation, depth,
 
                 # f = final_tt_map.codomain.foliation
                 try:
-                    new_fol = final_fol.with_changed_lengths(list(eigenvector))
+                    new_fol = final_fol.with_changed_lengths(lengths)
                 except SaddleConnectionError:
                     # sometimes the generated new lengths lead to a foliation
                     # with a saddle connection

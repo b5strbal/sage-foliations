@@ -21,10 +21,11 @@ EXAMPLES::
 #*****************************************************************************
 
 from sage.structure.sage_object import SageObject
+from sage.misc.functional import N
 
 from matplotlib.colors import ColorConverter
 from foliation import mod_one
-from constants import *
+from base import *
 
 _tikzcolors = ["red", "green", "blue", "cyan", "magenta", "yellow", 
     "gray", "brown", "lime", "olive", "orange", "pink", "purple", 
@@ -145,7 +146,7 @@ class FoliationLatex(SageObject):
         #     end_index = -2
         # else:
         #     end_index = -1
-        end_x = shift_point(separatrix.endpoint, hshift)
+        end_x = shift_point(N(separatrix.endpoint), hshift)
         end_y = get_y(separatrix.end_side())
         s += '\\draw[color={col}, {opt}] ({x},0) -- ({x},{y});\n'.format(x=end_x,
                                                                          y=end_y,
@@ -173,7 +174,7 @@ class FoliationLatex(SageObject):
     def _tikz_of_train_track_edge(self, edge):
         fol = self._foliation
         s = ''
-        m = [edge[i].endpoint(MID, fol) for i in [0,1]]
+        m = [N(edge[i].endpoint(MID, fol)) for i in [0,1]]
         y = [get_y(edge[i].endpoint_side(MID, fol))/2 for i in [0,1]]
         arrows = ['>','<']
         if edge[2] == 'pair':
@@ -197,10 +198,10 @@ class FoliationLatex(SageObject):
 
         x = []
         fac = 1 if fol.is_bottom_side_moebius() else 0.5
-        x.append(m[0] - edge[START].length(fol)*fac + overlap_length*fac)
-        x.append(m[1] - edge[END].length(fol)*fac +
+        x.append(N(m[0] - edge[START].length(fol)*fac + overlap_length*fac))
+        x.append(N(m[1] - edge[END].length(fol)*fac +
                  2*mod_one(edge[START].raw_endpoint(LEFT, fol) + shift -
-                           edge[END].raw_endpoint(LEFT, fol))*fac + overlap_length*fac)
+                           edge[END].raw_endpoint(LEFT, fol))*fac + overlap_length*fac))
                              
             
         transformations = [{''}, {''}]        
@@ -290,11 +291,10 @@ class FoliationLatex(SageObject):
                 if interval > interval.pair(fol):
                     begin_percent, end_percent = end_percent, begin_percent
 
-            x = [interval.endpoint(i, fol) for i in [LEFT, RIGHT]]
-            midx = interval.endpoint(MID, fol)
+            x = [N(interval.endpoint(i, fol)) for i in [LEFT, RIGHT]]
+            midx = N(interval.endpoint(MID, fol))
             y = [get_y(interval.endpoint_side(i, fol)) for i in [LEFT, RIGHT]]
-            color = _tikzcolor(self._foliation.index_of_label(
-                interval.label(fol)))
+            color = _tikzcolor(interval.numerical_label(fol))
             if x[RIGHT] == 0:
                 x[RIGHT] = 1
                 if fol.is_bottom_side_moebius():
@@ -377,7 +377,7 @@ class FoliationLatex(SageObject):
     # def _adjust_point(self, x):
     #     if not self._foliation.is_bottom_side_moebius():
     #         return x
-    #     if x > 0.5 - epsilon:
+    #     if x > 0.5 - EPSILON:
     #         return 2 * (x - 0.5)
     #     return 2 * x
 
