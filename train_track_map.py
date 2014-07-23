@@ -161,7 +161,11 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
 
 
     def get_PF_weights(self, field):
-        return pf_eigen_data(self.edge_matrix().transpose(), field)
+        try: 
+            return pf_eigen_data(self.edge_matrix().transpose(),
+        field)
+        except NoPFEigenvectorError:
+            return (None, None)
     
         # if not self.is_self_map():
         #     raise ValueError("The train track map should be a self-map.")
@@ -173,7 +177,13 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
         #     raise ValueError("The map is not pseudo-Anosov.")
 
     def get_PF_interval_lengths(self, field):
-        return list(pf_eigen_data(self.small_matrix().transpose(), field)[1])        
+        # print self.edge_matrix().eigenvalues()
+        # print self.small_matrix().eigenvalues()
+        try: 
+            return list(pf_eigen_data(self.small_matrix().transpose(),
+        field)[1])
+        except NoPFEigenvectorError:
+            return None
 
         # m = self.small_matrix().transpose()
         # try:
@@ -183,8 +193,8 @@ class TrainTrackMap(namedtuple("TrainTrackMap", "domain, codomain,"
         #     continue
 
         
-    def is_pseudo_anosov(self):
-        return is_perron_frobenius(self.edge_matrix())
+    # def is_pseudo_anosov(self):
+    #     return is_perron_frobenius(self.edge_matrix())
 
 
 
@@ -256,7 +266,8 @@ def pf_eigen_data(square_matrix, field):
         raise NoPFEigenvectorError("Dominant eigenvalue has multiplicity "
                                    "larger than one.")
     v = make_positive(largest[1][0])  # eigenvector
-    if v == -1: # cannot made positive
+    if v == -1: # cannot be made positive
+        # print evr
         raise NoPFEigenvectorError("Dominant eigenvector doesn't lie in the "
                                    "positive quadrant.")
     v /= sum(v)
@@ -365,7 +376,7 @@ class OrientedGraph():
         assert(m.is_square())
         for i in range(m.nrows()):
             for j in range(m.ncols()):
-                asssert(m[i,j] >= 0)
+                assert(m[i,j] >= 0)
                 
         self._n = m.nrows()
         self._adj_list = matrix_to_adj_list(m)

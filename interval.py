@@ -91,7 +91,9 @@ class Interval(namedtuple('Interval', 'side, index')):
         return fol._lengths[self.label(fol)]
 
     def is_wrapping(self, fol):
-        return self.endpoint(LEFT, fol) > self.endpoint(RIGHT, fol)
+        lep = self.endpoint(LEFT, fol)
+        rep = self.endpoint(RIGHT, fol)
+        return lep > rep and rep > 0
 
     def is_orientation_reversing(self, fol):
         return self.is_flipped(fol) != (self.pair(fol).side == self.side)

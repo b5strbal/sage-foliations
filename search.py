@@ -75,7 +75,7 @@ def create_pseudo_anosov(pa_cand):
     except SaddleConnectionError as ex:
         print "SaddleConnectionError: ", ex
         return None
-        
+
     try:
         return PseudoAnosov(tt_map)
     except ValueError:
@@ -117,9 +117,9 @@ def find_pseudo_anosov_candidates(foliation, depth,
 
                 # BUG: this is buggy when the twist is longer than
                 # the first interval
-                if final_tt_map.is_pseudo_anosov():
-                    lengths = final_tt_map.get_PF_interval_lengths(RDF)
-                else:
+                # if final_tt_map.is_pseudo_anosov():
+                lengths = final_tt_map.get_PF_interval_lengths(RDF)
+                if lengths == None:
                     continue
 
                 # m = final_tt_map.small_matrix().transpose()
@@ -174,3 +174,38 @@ def find_pseudo_anosov_candidates(foliation, depth,
 
     return result
     
+def find_PAs_with_sing_type(sing_type, stop_after_time = 10, depth = 1):
+    f = foliation_with_sing_type(sing_type)
+    pas = []
+    import time
+    from base import SaddleConnectionError
+    start = time.time()
+    while time.time() - start < stop_after_time:
+        f = f.with_changed_lengths()
+        new_pas = find_pseudo_anosovs(f,depth)
+        pas.extend(new_pas)
+        # if len(new_pas) > 0:
+        print str(len(new_pas)) + "pAs found."
+    padict = {round(x.stretch_factor(), 6) : x for x in pas if
+              x.stretch_factor() < 10}
+    return padict
+    
+def foliation_with_sing_type(sing_type):
+    assert(all(x%2 == 0 for x in sing_type))
+    num_labels = sum(sing_type)/2
+    labels = 2*range(num_labels)
+    import random
+    limit = 1000
+    while limit > 0:
+        limit -= 1
+        random.shuffle(labels)
+        f = Foliation(labels, 'moebius')
+        if f.singularity_type() != sing_type:
+            continue
+        try:
+            tt = f.train_track()
+            return f
+        except SaddleConnectionError:
+            continue
+    raise ValueError("No foliation with such singularity type has been"
+                     "found.")

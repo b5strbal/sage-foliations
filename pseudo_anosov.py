@@ -31,6 +31,8 @@ from interval import Interval
 class PseudoAnosov(SageObject):
     def __init__(self, tt_map):
         eigenvalue, eigenvector = tt_map.get_PF_weights(RDF)
+        if eigenvalue == None:
+            raise ValueError("Train track map is not pseudo-Anosov")
 
         tt = tt_map.domain
 
@@ -151,13 +153,10 @@ class PseudoAnosov(SageObject):
 def get_variables(n):
     if n == 0:
         return []
-    names = ['u','t','s','v','w','y','z']
     if n == 1:
-        return [var('u')]
-    if n <= 7:
-        return var(names[:n])
-    names = ['x' + str(i) for i in xrange(n)]
-    return var(names)
+        return [var('t')]
+    names = ['t' + str(i) for i in xrange(n)]
+    return list(var(names))
 
 def multi_power(variables, powers):
     assert(len(powers) == len(variables))
@@ -203,6 +202,7 @@ def fixed_charpoly(M, variables):
     """
     from sage.rings.polynomial.polynomial_ring_constructor import \
     PolynomialRing
+    from sage.rings.integer_ring import ZZ
     sub_vars = {v : var(str(v) + 'inv') for v in variables}
     ring = PolynomialRing(ZZ, variables + sub_vars.values()) \
            if len(variables) > 0 else ZZ
@@ -213,7 +213,7 @@ def fixed_charpoly(M, variables):
             a = exp.numerator()
             b = exp.denominator()
             new_M[i,j] = a * b.subs(sub_vars)
-    poly = new_M.charpoly('x')
+    poly = new_M.charpoly('u')
     back_sub = {str(sub_vars[v]) : 1/v for v in sub_vars}
     poly = poly.subs(**back_sub)
     return poly

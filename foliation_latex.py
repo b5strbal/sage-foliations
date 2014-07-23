@@ -24,7 +24,6 @@ from sage.structure.sage_object import SageObject
 from sage.misc.functional import N
 
 from matplotlib.colors import ColorConverter
-from foliation import mod_one
 from base import *
 
 _tikzcolors = ["red", "green", "blue", "cyan", "magenta", "yellow", 
@@ -35,6 +34,105 @@ def _tikzcolor(n):
     return _tikzcolors[n % len(_tikzcolors)]
 
 
+coloring_str = """% coloring
+
+\\foreach \\list in \\endpointarray{
+\\def\\lastx{}
+\\def\\lastsign{}
+
+\\foreach \\x/\\sign/\\notused/\\col/\\isflipped/\\mp[count=\\i from 0,\
+remember=\\x as \\lastx, remember=\\sign as \\lastsign] in \\list{
+\\ifnum \\i > 0
+
+\\def\\darkcolor{\\col!\\colorstrength!white}
+\\ifnum \\isflipped = 0 % interval is not flipped
+\\def\\bp{\\colorstrength}
+\\def\\ep{0}
+\\else
+\\def\\bp{0}
+\\def\\ep{\\colorstrength}
+\\fi
+
+\\ifnum \\wrappingindex = \\i
+
+\\ifnum \\sign = -1
+\\fill[left color=\\col!\\bp!white, right color=\
+\\col!\\mp!white]  (\\lastx, 0) rectangle (1,\\lastsign*0.5);
+\\fill[left color=\\col!\\mp!white, right color=\
+\\col!\\ep!white]  (0,0) rectangle (\\x, \\sign*0.5);
+\\else
+\\fill[left color=\\col!\\bp!white, right color = \\col!\\ep!white] \
+(\\lastx, 0) rectangle (\\x, \\sign*0.5);
+\\fi
+
+\\else
+
+\\fill[left color=\\col!\\bp!white, right color = \\col!\\ep!white] \
+(\\lastx, 0) rectangle (\\x, \\sign*0.5);
+
+\\fi
+\\fi
+}
+}
+
+"""
+
+
+define_pos_str = r"""\newcommand\definepos[1]{
+\ifnum #1 = 1
+\def\pos{above}
+\else
+\def\pos{below}
+\fi
+}
+
+"""
+
+separatrices_str = """% separatrices
+\\foreach \\list in \\endpointarray{
+\\foreach \\x/\\sign in \\list{
+\\draw (\\x,0) -- (\\x,\\sign*0.5);
+}
+}
+
+"""
+
+horizontal_sides_str = """% horizontal sides
+\\foreach \\sign in {-1,1}{
+\\draw[dashed] (0,\\sign*0.5) -- +(1,0);
+}
+
+"""
+
+center_line_str = """% center line
+\\draw[very thick] (0,0) -- (1,0);
+
+"""
+
+singularities_str = """% singularities
+\\foreach \\list in \\endpointarray{
+\\foreach \\x/\\sign/\\singcol in \\list{
+\\filldraw[fill=\\singcol, draw=black] (\\x,\\sign*0.5) circle (\\rad);
+}
+}
+
+"""
+
+labels_str = """% labels
+\\foreach \\x/\\sign/\\label in \\midpointarray{
+\\definepos{\\sign}
+\\node at (\\x,0) [\\pos] {\\label};
+}
+
+"""
+
+lengths_str = """% lengths
+\\foreach \\x/\\sign/\\label/\\length in \\midpointarray{
+\\definepos{\\sign}
+\\node at (\\x,\\sign*0.5) [\\pos] {\\length};
+}
+
+"""
 
 
 class FoliationLatex(SageObject):
@@ -174,6 +272,10 @@ class FoliationLatex(SageObject):
     def _tikz_of_train_track_edge(self, edge):
         fol = self._foliation
         s = ''
+
+            # r = '{startx}/{sign}/{midx}/{endx}'
+
+
         m = [N(edge[i].endpoint(MID, fol)) for i in [0,1]]
         y = [get_y(edge[i].endpoint_side(MID, fol))/2 for i in [0,1]]
         arrows = ['>','<']
@@ -260,6 +362,8 @@ class FoliationLatex(SageObject):
         latex.add_to_preamble('\\usetikzlibrary{decorations.markings}\n')
         latex.add_to_preamble('\\usetikzlibrary{arrows}\n')
 
+        fol = self._foliation
+        
         s = ''
         if len(train_tracks) > 0:
             for arrow in ['>', '<']:
@@ -271,100 +375,72 @@ class FoliationLatex(SageObject):
 
         s += '\\begin{{tikzpicture}}[scale = {0},>=stealth\','\
             'font=\\tiny]\n'.format(scale_size)
+        s += '\\def\\rad{0.005}\n'
+        s += '\\def\\colorstrength{{{0}}}\n'.format(color_strength)
 
+        if not fol.is_bottom_side_moebius():
+            wrappingindex = fol.num_intervals(BOTTOM)
+        else:
+            for interval in fol.intervals():
+                if interval.is_wrapping(fol):
+                    wrappingindex = interval.index + 1
+                    break
+                
+        s += '\\def\\wrappingindex{{{0}}}\n\n'.format(wrappingindex)            
 
-        singularities = ''
-        lines = ''
-        fillings = ''
-        labels = ''
-
-        fol = self._foliation
+        s += '\\def\\midpointarray{'
+        
         for interval in fol.intervals():
-
-            begin_percent = color_strength
-            end_percent = 0
-            middle_percent = None
-
             signed_label = str(interval.label(fol))
             if interval.is_flipped(fol):
                 signed_label = '-' + signed_label
-                if interval > interval.pair(fol):
-                    begin_percent, end_percent = end_percent, begin_percent
 
-            x = [N(interval.endpoint(i, fol)) for i in [LEFT, RIGHT]]
-            midx = N(interval.endpoint(MID, fol))
-            y = [get_y(interval.endpoint_side(i, fol)) for i in [LEFT, RIGHT]]
-            color = _tikzcolor(interval.numerical_label(fol))
-            if x[RIGHT] == 0:
-                x[RIGHT] = 1
-                if fol.is_bottom_side_moebius():
-                    y[RIGHT] = -0.5
+            r = '{mid}/{side}/{label}/{length}, '
+            s += r.format(mid = N(interval.endpoint(MID, fol)),
+                          side = (-1)**interval.endpoint_side(MID, fol),
+                          label = signed_label,
+                          length = round(interval.length(fol), 4))
+            
+            
+        s = s[:-2] + '}\n\n\\def\\endpointarray{{0/1/'
+        s += _tikzcolor(fol.intervals()[0].which_singularity(fol))
+
+        for interval in fol.intervals():
+            if interval == (BOTTOM,0):
+                s += '}, {' + endpoint_entry(interval.prev(fol), fol,
+                                             color_strength)
+            s += ', ' + endpoint_entry(interval, fol,
+                                       color_strength)
 
 
-            temp_lines = '\\draw ({x0},0) -- ({x0},{y0});\n'
-            if x[LEFT] < x[RIGHT]:
-                temp_lines += '\\draw[dashed] ({x0},{y0}) -- ({x1},{y1});\n'
-                temp_fillings = '\\shade[left color = {col}!{bp}!white, '\
-                        'right color = {col}!{ep}!white] ({x0},0) rectangle '\
-                        '({x1},{y1});\n'
-            else:
-                temp_lines += '\\draw[dashed] ({x0},{y0}) -- (1,{y0});\n'
-                temp_lines += '\\draw[dashed] (0,-0.5) -- ({x1},-0.5);\n'
-                middle_percent = color_strength * (x[RIGHT]) / (1 + x[1] - x[0])
-                if begin_percent == 0:
-                    middle_percent = color_strength - middle_percent
+        s += '}}\n\n'
 
-                temp_fillings = '\\shade[left color = {col}!{bp}!white, '\
-                        'right color = {col}!{mp}!white] ({x0},0) rectangle '\
-                        '(1,{y0});\n'
-                temp_fillings += '\\shade[left color = {col}!{mp}!white, '\
-                        'right color = {col}!{ep}!white] (0,0) rectangle '\
-                        '({x1},{y1});\n'
+        s += coloring_str + define_pos_str + separatrices_str + \
+             horizontal_sides_str + center_line_str + singularities_str
 
-            lines += temp_lines.format(x0=x[0],x1=x[1],y0=y[0],y1=y[1])
-            fillings += temp_fillings.format(col=color,
-                                             x0=x[0],x1=x[1],y0=y[0],y1=y[1],
-                                             bp=begin_percent,
-                                             ep=end_percent,
-                                             mp=middle_percent)
+        if interval_labelling:
+            s += labels_str
 
-            sing_color = _tikzcolor(interval.which_singularity(fol))
-            singularities += '\\filldraw[fill={col}, draw = black] ({x0},{y0}) '\
-                    'circle (0.005);\n'.format(x0=x[0],y0=y[0], col = sing_color)
-            midy = get_y(interval.endpoint_side(MID, fol))
-            above_or_below = 'above' if midy == 0.5 else 'below'
-
-            if length_labelling:
-                labels += '\\node at ({m},0) [{pos}] {{{label}}};\n'.\
-                        format(m=midx, pos=above_or_below, label=signed_label)
-            if interval_labelling:
-                labels += '\\node at ({m},{y}) [{pos}] {{{length}}};\n'.\
-                        format(m=midx, y=midy, pos=above_or_below,
-                               length=round(interval.length(fol), 4))
-
-        lines += '\\draw (1,0) -- (1,{y});\n'\
-                '\\draw[very thick] (0,0) -- (1,0);\n'.format(y=-0.5 if fol.is_bottom_side_moebius()
-                                                              else 0.5)
-
+        if length_labelling:
+            s += lengths_str
 
         cc = ColorConverter()
-        rgb = cc.to_rgb(self.get_option('separatrix_color'))
-        s += '\\definecolor{{separatrixcolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
-        rgb = cc.to_rgb(self.get_option('transverse_curve_color'))
-        s += '\\definecolor{{curvecolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
+            
+        if len(separatrices) > 0:
+            rgb = cc.to_rgb(self.get_option('separatrix_color'))
+            s += '\\definecolor{{separatrixcolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
+            opts = self.get_option('separatrix_draw_options')
+            s += '\\tikzstyle{{separatrix opts}}=[{opts}]\n'.format(opts = opts)
 
-
-        opts = self.get_option('separatrix_draw_options')
-        s += '\\tikzstyle{{separatrix opts}}=[{opts}]\n'.format(opts = opts)
-
-        opts = self.get_option('transverse_curve_draw_options')
-        s += '\\tikzstyle{{curve opts}}=[{opts}]\n'.format(opts = opts)
-
-
-        s += fillings + lines + singularities + labels
         for separatrix in separatrices:
             s += self._tikz_of_separatrix(separatrix)
 
+        if len(transverse_curves) > 0:
+            rgb = cc.to_rgb(self.get_option('transverse_curve_color'))
+            s += '\\definecolor{{curvecolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
+            opts = self.get_option('transverse_curve_draw_options')
+            s += '\\tikzstyle{{curve opts}}=[{opts}]\n'.format(opts = opts)
+            
         for curve in transverse_curves:
             s += self._tikz_of_curve(curve)
 
@@ -374,24 +450,39 @@ class FoliationLatex(SageObject):
         s += '\\end{tikzpicture}\n'
         return s
 
-    # def _adjust_point(self, x):
-    #     if not self._foliation.is_bottom_side_moebius():
-    #         return x
-    #     if x > 0.5 - EPSILON:
-    #         return 2 * (x - 0.5)
-    #     return 2 * x
+def endpoint_entry(interval, fol, color_strength):
+    begin_percent = color_strength
+    end_percent = 0
+    middle_percent = ''
 
+    if interval.is_flipped(fol) and interval > interval.pair(fol):
+        begin_percent, end_percent = end_percent, begin_percent
 
-    # def _get_side(self, side, point):
-    #     if not self._foliation.is_bottom_side_moebius():
-    #         return side
-    #     if point < 0.5:
-    #         return TOP
-    #     else:
-    #         return BOTTOM
+    r = '{x}/{side}/{singcol}/{col}/{isflipped}/{mp}'
+    rep = fixed_rep(interval, fol)
+    side = (-1)**interval.endpoint_side(RIGHT, fol) \
+           if rep < 1 else (-1)**interval.endpoint_side(LEFT,
+                                                        fol)
+    lep = interval.endpoint(LEFT, fol)
+    if rep < lep:
+        middle_percent = color_strength * rep / (1 + rep - lep)
+        if begin_percent == 0:
+            middle_percent = color_strength - middle_percent
 
-    # def _get_y(self, side, point):
-    #     return (-1)**self._get_side(side, point) * 0.5
+    return r.format(x = rep if rep > 0 else 1,
+                    side = side,
+                    singcol = _tikzcolor(interval.next(fol).\
+                                         which_singularity(fol)),
+                    col = _tikzcolor(interval.numerical_label(fol)),
+                    isflipped = 1 if interval.is_flipped(fol) else 0,
+                    mp = middle_percent)
+
+    
+
+def fixed_rep(interval, fol):
+    rep = N(interval.endpoint(RIGHT, fol))
+    return rep if rep > 0 else 1
+    
 
 def shift_point(x, direction = None):
     if direction == None:

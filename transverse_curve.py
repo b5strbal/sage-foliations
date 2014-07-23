@@ -165,3 +165,13 @@ def get_codings(foliation):
                                 
     return codings
 
+
+def other_tts(fol, depth):
+    if depth <= 0:
+        if fol.train_track()._degrees == [3,3,3,3,3,3]:
+            print fol
+        return
+    codings = get_codings(fol)
+    for c in codings:
+        tc = TransverseCurve(fol, c)
+        other_tts(tc.new_foliation()[0], depth-1)

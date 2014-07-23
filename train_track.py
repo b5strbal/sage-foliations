@@ -156,7 +156,7 @@ class TrainTrack(SageObject):
         return self._index_to_edge # list
 
     def kernel_from_singularities(self):
-        circles = self.sample_fol().paths_around_singularities
+        circles = self.paths_around_singularities()
         return matrix([self.path_to_vector(circle, SIGNED) for circle in circles])
 
         # the row vectors might not be primitive, so to scale them down
@@ -329,9 +329,7 @@ class TrainTrack(SageObject):
         # BUG: when the twist is longer than the first interval, this, and the 
         # small matrix calculation is buggy
         
-        if hasattr(self
-
-        , '_reducing_matrix'):
+        if hasattr(self , '_reducing_matrix'):
             return self._reducing_matrix
         from copy import copy
         from sage.rings.rational import Rational

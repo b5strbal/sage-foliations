@@ -155,7 +155,14 @@ tt_map = tt_map_from_codings(fol_min4.train_track(),
                              [RestrictionCoding(fol_min4, Coding(0,3,1,0,0))])
 pa_min4 = PseudoAnosov(tt_map)
 
+fol_with_sing_4_4 = Foliation('a a c b b d c d','moebius')
+fol_with_sing_6_4 = Foliation('a a e e d b d c c b','moebius')
+fol_with_sing_4_4_4 = Foliation('f f d e a d b c e c b a','moebius')
 
+fol_min_genus2 = Foliation('1 2 3', '3 2 1', [0.302775637732,
+                                              0.175819339757,
+                                              0.521405022511] , twist
+                                              = 0.0592868094824)
 # def family_B_tt_map(n, k):
 #     fol = family_B_foliation_nonor(n, k)
 #     coding_list = [Coding(0,0,1,0,0),False,1]
@@ -174,3 +181,8 @@ def family_A_PA_other(n, k, is_orientable):
     tt_map = tt_map_from_codings(fol.train_track(), coding_list)
     # return (tt_map.domain, tt_map.codomain)
     return PseudoAnosov(tt_map)
+
+
+s = """This is a long literal \
+hohohooo, \
+sdfasfd"""

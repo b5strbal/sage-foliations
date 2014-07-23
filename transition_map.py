@@ -102,7 +102,10 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
             s2 = separatrices[side][(i+1)%len(separatrices[side])]
             if hdir == LEFT:
                 s1, s2 = s2, s1
-            lengths[label] = mod_one(s2.endpoint - s1.endpoint)
+            if len(separatrices[side]) == 1:
+                lengths[label] = 1
+            else:
+                lengths[label] = mod_one(s2.endpoint - s1.endpoint)
             if i == len(separatrices[side]) - 1 or \
                side_of_sep(s1, adj_starting_side, adj_starting_point, hdir) !=\
                side_of_sep(s2, adj_starting_side, adj_starting_point, hdir):
@@ -124,6 +127,7 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
     #     exit()
 
     # try:
+    # print gen_perm, lengths, flips, twist
     new_fol = Foliation(*gen_perm, lengths = lengths,
                         flips = flips, twist = twist)
     # except SaddleConnectionError:
@@ -161,12 +165,12 @@ def get_tt_map(old_fol, new_fol, path_entries, transformation_coding):
         
     # Also, finding the intervals on the opposite side of it that will need
     # to be corrected.
-    start = long_path_int.endpoint(LEFT, new_fol)
+    start = long_path_int.raw_endpoint(LEFT, new_fol)
     # new_fol.divpoints[long_path_int[0]][long_path_int[1]]
     bound = start + 0.5 if new_fol.is_bottom_side_moebius() else start
     n = new_fol.num_intervals(TOP) - 1
     
-    while Interval(TOP, n).endpoint(LEFT, new_fol) > bound:
+    while Interval(TOP, n).raw_endpoint(LEFT, new_fol) > bound:
         to_be_corrected.append((0,n))
         n -= 1
 
