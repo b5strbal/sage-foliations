@@ -33,6 +33,14 @@ _tikzcolors = ["red", "green", "blue", "cyan", "magenta", "yellow",
 def _tikzcolor(n):
     return _tikzcolors[n % len(_tikzcolors)]
 
+draw_separatrix_command = """% command for drawing separatrices
+\\newcommand\\drawSeparatrices[1]{
+\\foreach \\x/\\yone/\\ytwo in #1{
+\\draw (\\x,\\yone) -- (\\x,\\ytwo);
+}
+}
+
+"""
 
 coloring_str = """% coloring
 
@@ -78,7 +86,8 @@ remember=\\x as \\lastx, remember=\\sign as \\lastsign] in \\list{
 """
 
 
-define_pos_str = r"""\newcommand\definepos[1]{
+define_pos_str = r"""% Defines \pos as "above" or "below" whether #1 is 1 or -2
+\newcommand\definepos[1]{
 \ifnum #1 = 1
 \def\pos{above}
 \else
@@ -130,6 +139,61 @@ lengths_str = """% lengths
 \\foreach \\x/\\sign/\\label/\\length in \\midpointarray{
 \\definepos{\\sign}
 \\node at (\\x,\\sign*0.5) [\\pos] {\\length};
+}
+
+"""
+
+train_track_str = r"""
+% Arrow at a certain position of an edge, 0.5 is the center.
+\tikzset{
+->-/.style={
+decoration={markings,
+mark= at position #1 with {\arrow{>}},},
+postaction={decorate}}}
+
+% Drawing half of a center edge.
+% The starting and ending points are (#1,#2) and (#3,#4).
+% #5 is the label. #6 is drawing options, e.g. arrow.
+\newcommand\drawedge[6]{
+\pgfmathsetmacro\diff{(#4-#2)/2}
+\draw[#6] (#1,#2) .. controls +(0,\diff) and +(0,-\diff) .. (#3,#4)
+node[midway,\pos\space left] {#5};
+}
+
+% Drawing the train track.
+% #1 - list of data for each interval
+% #2 - list of codings of transformations that indentify the two
+% vertical sides and the identity
+\newcommand\traintrack[2]{
+\foreach \x/\sign/\mid/\final/\outgoing/\ei[count=\i] in #1{
+\definepos{\sign}
+
+% the vertices v_i
+\fill (\x, \sign*0.25) circle (\rad) node[right] {$v_\i$};
+
+\ifnum \outgoing = 1
+\def\starty{0.25}
+\def\endy{0.5}
+\def\labl{\ei}
+\else
+\def\starty{0.5}
+\def\endy{0.25}
+\def\labl{}
+\fi
+
+% the edges e_i
+\draw[->-=0.5] (\x,\sign*\starty) -- node[midway,right] {\labl} (\x,\sign*\endy);
+
+\clip (0,-0.5) rectangle (1,0.5);
+
+% the edges f_i
+\foreach \xshift/\yscale in #2{
+\begin{scope}[xshift=\xshift cm,yscale=\yscale]
+\drawedge{\x}{\sign*0.25}{\mid}{0}{$f_{\i}$}{->-=0.5}
+\drawedge{\mid}{0}{\final}{-\sign*0.25}{}{}
+\end{scope}
+}
+}
 }
 
 """
@@ -195,147 +259,6 @@ class FoliationLatex(SageObject):
         else:
             return self.__default_options[option_name]
 
-    def _draw_segment(self, u, v):
-        return '\\draw[color=curvecolor,curve opts] ({u},0) -- ({v},0);\n'.\
-            format(u = u, v = v)
-
-    def _tikz_of_curve(self, transverse_curve):
-        arcshift = RIGHT if transverse_curve.direction() == LEFT else LEFT
-        ep = [transverse_curve.arc()[i] for i in [0,1]]
-        u, v = [shift_point(ep[i], arcshift) for i in [0,1]]
-        
-        if u < v:
-            s = self._draw_segment(u, v)
-        else:
-            s = self._draw_segment(u, 1)
-            if v >= 0:
-                # otherwise we don't want the little segment between 0 and v
-                s += self._draw_segment(0, v)
-
-
-        sep = [transverse_curve.separatrix(i) for i in [0,1]]
-        hshifts = [(arcshift + 1) % 2 if sep[i].is_flipped() else arcshift
-                   for i in [0,1]]
-        for i in range(2):
-            s += self._tikz_of_separatrix(transverse_curve.separatrix(i),
-                                          hshifts[i])
-        return s
-
-    def _tikz_of_separatrix(self, separatrix, hshift = None):
-        color = 'separatrixcolor' if hshift == None else 'curvecolor'
-        opts = 'separatrix opts' if hshift == None else 'curve opts'
-
-        fol = self._foliation
-        s = ''
-        for i in range(separatrix.num_intersections() - 1):
-            x = separatrix.get_intersection(i)
-            x = shift_point(x, hshift)
-            s += '\\draw[color={col}, {opt}] ({x},-0.5) --'\
-                 ' ({x},0.5);\n'.format(x=x, opt = opts,
-                                        col = color)
-            if separatrix.get_tt_edge(2 * i + 1).start().is_flipped(fol):
-                hshift = (hshift + 1) % 2 if hshift != None else None
-
-        # # the following correction is necessary to handle the difference
-        # # between a separatrix that stops just before the Moebius band
-        # # and another that stops right after it.
-        # if self._foliation.is_bottom_side_moebius() and \
-        #    separatrix.num_intersections() % 2 == 0:
-        #     end_index = -2
-        # else:
-        #     end_index = -1
-        end_x = shift_point(N(separatrix.endpoint), hshift)
-        end_y = get_y(separatrix.end_side())
-        s += '\\draw[color={col}, {opt}] ({x},0) -- ({x},{y});\n'.format(x=end_x,
-                                                                         y=end_y,
-                                                                         opt = opts,
-                                                                         col = color)
-        return s
-
-
-
-    def _tikz_of_train_track(self, train_track):
-        s = ''
-        # for vertex in train_track.vertices():
-        #     s += self._tikz_of_train_track_vertex(vertex)
-        for edge in train_track.edges():
-            s += self._tikz_of_train_track_edge(edge)
-        return s
-
-    # def _tikz_of_train_track_vertex(self, vertex):
-    #     interval = vertex
-    #     return '\\fill ({x},{y}) circle (0.005);\n'.format(
-    #         x = interval.midpoint(), y = self._end_y(interval.side)/2)
-
-
-
-    def _tikz_of_train_track_edge(self, edge):
-        fol = self._foliation
-        s = ''
-
-            # r = '{startx}/{sign}/{midx}/{endx}'
-
-
-        m = [N(edge[i].endpoint(MID, fol)) for i in [0,1]]
-        y = [get_y(edge[i].endpoint_side(MID, fol))/2 for i in [0,1]]
-        arrows = ['>','<']
-        if edge[2] == 'pair':
-            return "".join(['\\fill ({x},{y1}) circle (0.005);\n'\
-                '\\draw[-{arr}-={pos}] ({x},{y1}) -- ({x},{y2});\n'.format(
-                    pos = (-1)**i * 0.5, x = m[i],
-                    y1 = y[i], y2 =2 * y[i],
-                    arr = arrows[i]) for i in [0,1]])
-                            
-        clip = edge[START].is_wrapping(fol) or edge[END].is_wrapping(fol)
-        if clip:
-            s += '\\begin{scope}\n'\
-                 '\\clip (0,-0.5) rectangle (1,0.5);\n'
-        
-        shift = 0.5 if fol.is_bottom_side_moebius() else 0.0
-
-        overlap_length = min(mod_one(edge[END].raw_endpoint(RIGHT, fol) + shift -
-                                     edge[START].raw_endpoint(LEFT, fol)),
-                             mod_one(edge[START].raw_endpoint(RIGHT, fol) -
-                                     edge[START].raw_endpoint(LEFT, fol)))
-
-        x = []
-        fac = 1 if fol.is_bottom_side_moebius() else 0.5
-        x.append(N(m[0] - edge[START].length(fol)*fac + overlap_length*fac))
-        x.append(N(m[1] - edge[END].length(fol)*fac +
-                 2*mod_one(edge[START].raw_endpoint(LEFT, fol) + shift -
-                           edge[END].raw_endpoint(LEFT, fol))*fac + overlap_length*fac))
-                             
-            
-        transformations = [{''}, {''}]        
-        for i in range(2):
-            if x[i] < 0:
-                if fol.is_bottom_side_moebius():
-                    transformations[i].add('xshift=1cm,yscale=-1')                     
-                else:
-                    transformations[i].add('xshift=1cm')
-            elif x[i] > 1:
-                if fol.is_bottom_side_moebius():
-                    transformations[i].add('xshift=-1cm,yscale=-1')                     
-                else:
-                    transformations[i].add('xshift=-1cm')
-
-        # print m, x, y, overlap_length, right_endpoint
-        
-        s += center_edge_piece(m[0], y[0], x[0], 0, transformations[0], True)
-        s += center_edge_piece(x[1], 0, m[1], y[1], transformations[1])
-
-        if clip:
-            s += '\\end{scope}\n'
-
-        return s
-
-
-
-        
-
-
-
-
 
     def tikz_picture(self, separatrices = [], train_tracks = [],
                      transverse_curves = []):
@@ -364,16 +287,7 @@ class FoliationLatex(SageObject):
 
         fol = self._foliation
         
-        s = ''
-        if len(train_tracks) > 0:
-            for arrow in ['>', '<']:
-                s += '\\tikzset{-' + arrow + '-/.style={\n'\
-                     'decoration={markings,\n'\
-                     'mark= at position #1 with {\\arrow{' + arrow + '}},'\
-                     '},\n'\
-                     'postaction={decorate}}}\n'
-
-        s += '\\begin{{tikzpicture}}[scale = {0},>=stealth\','\
+        s = '\\begin{{tikzpicture}}[scale = {0},>=stealth\','\
             'font=\\tiny]\n'.format(scale_size)
         s += '\\def\\rad{0.005}\n'
         s += '\\def\\colorstrength{{{0}}}\n'.format(color_strength)
@@ -387,7 +301,6 @@ class FoliationLatex(SageObject):
                     break
                 
         s += '\\def\\wrappingindex{{{0}}}\n\n'.format(wrappingindex)            
-
         s += '\\def\\midpointarray{'
         
         for interval in fol.intervals():
@@ -396,7 +309,7 @@ class FoliationLatex(SageObject):
                 signed_label = '-' + signed_label
 
             r = '{mid}/{side}/{label}/{length}, '
-            s += r.format(mid = N(interval.endpoint(MID, fol)),
+            s += r.format(mid = round(interval.endpoint(MID, fol),7),
                           side = (-1)**interval.endpoint_side(MID, fol),
                           label = signed_label,
                           length = round(interval.length(fol), 4))
@@ -414,7 +327,6 @@ class FoliationLatex(SageObject):
 
 
         s += '}}\n\n'
-
         s += coloring_str + define_pos_str + separatrices_str + \
              horizontal_sides_str + center_line_str + singularities_str
 
@@ -425,27 +337,36 @@ class FoliationLatex(SageObject):
             s += lengths_str
 
         cc = ColorConverter()
-            
+
+        if len(separatrices) > 0 or len(transverse_curves) > 0:
+            s += draw_separatrix_command
+        
         if len(separatrices) > 0:
             rgb = cc.to_rgb(self.get_option('separatrix_color'))
+            s += '% separatrices\n'
             s += '\\definecolor{{separatrixcolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
             opts = self.get_option('separatrix_draw_options')
             s += '\\tikzstyle{{separatrix opts}}=[{opts}]\n'.format(opts = opts)
+            s += tikz_of_separatrices(separatrices)
 
-        for separatrix in separatrices:
-            s += self._tikz_of_separatrix(separatrix)
+        # for separatrix in separatrices:
+        #     s += tikz_of_separatrix(separatrix)
 
         if len(transverse_curves) > 0:
             rgb = cc.to_rgb(self.get_option('transverse_curve_color'))
+            s += '% transverse curves'
             s += '\\definecolor{{curvecolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
             opts = self.get_option('transverse_curve_draw_options')
             s += '\\tikzstyle{{curve opts}}=[{opts}]\n'.format(opts = opts)
             
         for curve in transverse_curves:
-            s += self._tikz_of_curve(curve)
+            s += tikz_of_curve(curve)
 
+        if len(train_tracks) > 0:
+            s += train_track_str
+            
         for train_track in train_tracks:
-            s += self._tikz_of_train_track(train_track)
+            s += tikz_of_train_track(train_track, fol)
 
         s += '\\end{tikzpicture}\n'
         return s
@@ -480,7 +401,7 @@ def endpoint_entry(interval, fol, color_strength):
     
 
 def fixed_rep(interval, fol):
-    rep = N(interval.endpoint(RIGHT, fol))
+    rep = round(interval.endpoint(RIGHT, fol),7)
     return rep if rep > 0 else 1
     
 
@@ -495,28 +416,126 @@ def get_y(side):
     return (-1)**side * 0.5
 
 
-def center_edge_piece(x1, y1, x2, y2, transformations = '',
-                       has_arrow = False):
-    r"""
 
-    INPUT:
+def tikz_of_train_track(tt, fol):
+    s = '\\def\\ttdata{'
+    shift = 0.5 if fol.is_bottom_side_moebius() else 0.0
+    fac = 1 if fol.is_bottom_side_moebius() else 0.5
 
-    - ``x1`` -- 
+    transformations = '0/1,1/-1,-1/-1' if fol.is_bottom_side_moebius() \
+                      else '0/1,1/1,-1/1'
+    
+    for interval in fol.intervals():
+        if interval.pair(fol) > interval:
+            ei = '$e_{0}$'.format(interval.numerical_label(fol) + 1)
+            outgoing = 1
+        else:
+            ei = ''
+            outgoing = 0
+        edge = tt.get_edge_from(interval, 'center')
+        x, final = [round(edge[i].endpoint(MID, fol),7) for i in [0,1]]
+        sign = (-1)**edge[0].endpoint_side(MID, fol)
 
-    - ``y1`` -- 
+        overlap_length = min(mod_one(edge[END].raw_endpoint(RIGHT, fol) + shift -
+                                     edge[START].raw_endpoint(LEFT, fol)),
+                             mod_one(edge[START].raw_endpoint(RIGHT, fol) -
+                                     edge[START].raw_endpoint(LEFT, fol)))
 
-    - ``x2`` -- 
+        # the midpoint calculated from START
+        mid = round(x - edge[START].length(fol)*fac +\
+                    overlap_length*fac,7)
 
-    - ``y2`` -- 
+        # the midpoint calculated from END
+        mid2 = round(final - edge[END].length(fol)*fac +
+                     2*mod_one(edge[START].raw_endpoint(LEFT, fol) + shift -
+                               edge[END].raw_endpoint(LEFT, fol))*fac +\
+                     overlap_length*fac,7)
 
-    """
-    s = ''
-    for transf in transformations:
-        s += '\\draw[{arrow},{transf}] '\
-             '({x1},{y1}) .. controls +(0,{tan}) and'\
-             ' +(0,-{tan}) .. ({x2},{y2});\n'.format(
-                 x1 = x1, x2 = x2, y1 = y1, y2 = y2,
-                 transf = transf , tan = (y2 - y1)/2,
-                 arrow = '->' if has_arrow else '')
+        # if they are different, then the edge crosses the vertical
+        # boundaries, so 'final' has to be shifted
+        final += mid - mid2
+
+        s += '{x}/{sign}/{mid}/{final}/{outgoing}/{ei}'.\
+             format(x = x, sign = sign, mid = mid, final = final,
+             outgoing = outgoing, ei = ei) + ', '
+
+    s = s[:-2] + '}\n\\def\\transformations{' +\
+        transformations + '}\n'
+
+    return s + '\\traintrack{\\ttdata}{\\transformations}\n\n'
+
+
+
+
+
+def draw_segment(u, v):
+    return '\\draw[color=curvecolor,curve opts] ({u},0) -- ({v},0);\n'.\
+        format(u = u, v = v)
+
+def tikz_of_curve(transverse_curve):
+    arcshift = RIGHT if transverse_curve.direction() == LEFT else LEFT
+    ep = [transverse_curve.arc()[i] for i in [0,1]]
+    u, v = [shift_point(ep[i], arcshift) for i in [0,1]]
+
+    if u < v:
+        s = draw_segment(u, v)
+    else:
+        s = draw_segment(u, 1)
+        if v >= 0:
+            # otherwise we don't want the little segment between 0 and v
+            s += draw_segment(0, v)
+
+
+    sep = [transverse_curve.separatrix(i) for i in [0,1]]
+    hshifts = [(arcshift + 1) % 2 if sep[i].is_flipped() else arcshift
+               for i in [0,1]]
+    # sep_shifts = 
+    # for i in range(2):
+    #     s += tikz_of_separatrix(transverse_curve.separatrix(i),
+    #                                   hshifts[i])
+
+    return tikz_of_separatrices(sep, hshifts) + s + '\n\n'
+                                
+
+def tikz_of_separatrices(separatrices, hshifts = None):
+    color = 'separatrixcolor' if hshifts == None else 'curvecolor'
+    opts = 'separatrix opts' if hshifts == None else 'curve opts'
+    
+    int_entries = []
+    for i in range(len(separatrices)):
+        hshift = hshifts[i] if hshifts else None
+        int_entries.extend(intersection_entries(separatrices[i], hshift))
+    s = make_intersection_list(int_entries)
+    s += """
+
+    \\begin{{scope}}[color={col},{opt}]
+    \\drawSeparatrices{{\\intersections}}
+    \\end{{scope}}
+
+    """.format(col = color, opt = opts)
     return s
+
+    
+
+
+def intersection_entries(separatrix, hshift = None):
+    entries = []
+    fol = separatrix.foliation
+    for i in range(separatrix.num_intersections() - 1):
+        x = separatrix.get_intersection(i)
+        x = shift_point(x, hshift)
+        entries.append('{x}/-0.5/0.5'.format(x = x))
+        if separatrix.get_tt_edge(2 * i + 1).start().is_flipped(fol):
+            hshift = (hshift + 1) % 2 if hshift != None else None
+
+    end_x = shift_point(round(separatrix.endpoint,7), hshift)
+    end_y = get_y(separatrix.end_side())
+    entries.append('{x}/0/{y}'.format(x=end_x, y = end_y))
+
+    return entries
+
+def make_intersection_list(intersection_entry_list):
+    return "\\def\\intersections{{{0}}}".\
+        format(', '.join(intersection_entry_list))
+
 
