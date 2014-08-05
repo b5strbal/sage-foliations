@@ -354,7 +354,7 @@ class FoliationLatex(SageObject):
 
         if len(transverse_curves) > 0:
             rgb = cc.to_rgb(self.get_option('transverse_curve_color'))
-            s += '% transverse curves'
+            s += '% transverse curves\n'
             s += '\\definecolor{{curvecolor}}{{rgb}}{{{0},{1},{2}}}\n'.format(*rgb)
             opts = self.get_option('transverse_curve_draw_options')
             s += '\\tikzstyle{{curve opts}}=[{opts}]\n'.format(opts = opts)
