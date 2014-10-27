@@ -169,7 +169,7 @@ node[midway,\pos\space left] {#5};
 \definepos{\sign}
 
 % the vertices v_i
-\fill (\x, \sign*0.25) circle (\rad) node[right] {$v_\i$};
+\fill (\x, \sign*0.25) circle (\rad) node[right] {$v_{\i}$};
 
 \ifnum \outgoing = 1
 \def\starty{0.25}
@@ -515,7 +515,6 @@ def tikz_of_separatrices(separatrices, hshifts = None):
     """.format(col = color, opt = opts)
     return s
 
-    
 
 
 def intersection_entries(separatrix, hshift = None):

@@ -34,7 +34,6 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
                   adj_ending_point = None, lift_type = None,
                   transformation_coding = None):
 
-
     if adj_ending_point == None:
         arc_length = 1
         adj_ending_point = adj_starting_point
@@ -82,6 +81,7 @@ def new_foliation(separatrices, adj_starting_point, adj_starting_side,
                 continue
 
             for end in range(num_path_entries):
+                # print side, i, end
                 path_entries[(side,i,end)] = \
                         get_pair_and_path(separatrices,
                                           side, i, end,
@@ -258,7 +258,8 @@ def break_apart(paths, long_end = None):
 PathEntry = namedtuple("PathEntry", "new_side,new_i,new_end,path")
 
 def get_pair_and_path(separatrices, side, i, end, 
-                       lift_type, hdir, ending_point, do_we_cut):
+                      lift_type, hdir, ending_point, do_we_cut):
+    original_end = end
     fol = separatrices[0][0].foliation 
     tt = fol.train_track()
     s0 = separatrices[side][(i + end) % len(separatrices[side])]
@@ -287,7 +288,7 @@ def get_pair_and_path(separatrices, side, i, end,
     interval = interval2
     if interval.is_flipped(fol):
         end = (end + 1) % 2
-    if end == 1:
+    if end == RIGHT:
         interval = interval.next(fol)
     is_flipped_so_far = start_end != end 
     new_side, new_i = matching_sep_index(separatrices,
@@ -320,8 +321,8 @@ def get_pair_and_path(separatrices, side, i, end,
 
     # on the last right end of the last interval on the top side,
     # the traintrack path has to be cut off early
-    begin_cut = (side, i, end) == (0, len(separatrices[0]) - 1, 1)
-    end_cut = (new_side, new_i, end) == (0, len(separatrices[0]) - 1, 1)
+    begin_cut = (side, i, original_end) == (TOP, len(separatrices[0]) - 1, RIGHT)
+    end_cut = (new_side, new_i, end) == (TOP, len(separatrices[0]) - 1, RIGHT)
 
     # do_we_cut: when the transformation is a rotation or reversing, we
     # should not cut
@@ -337,6 +338,8 @@ def get_pair_and_path(separatrices, side, i, end,
     # print s1
 
     p0 = p1 = None
+    # print s0.intersections()
+    # print s1.intersections()
     if ending_point in s0.intersections():
         if end_cut:
             path = s0.tt_path(end, ending_point, 'after').reversed()
@@ -423,3 +426,4 @@ def double_separatrices(separatrices):
     i = next(i for i in range(len(separatrices))
              if separatrices[i].endpoint > separatrices[i+1].endpoint)
     return [separatrices, separatrices[i+1:] + separatrices[:i+1]]
+

@@ -153,7 +153,9 @@ class Separatrix(SageObject):
         # print endpoint
 
         cutting_index = 0
+        # print endpoint
         while self._intersections[cutting_index] != endpoint:
+            # print cutting_index, self._intersections[cutting_index]
             cutting_index += 1
 
         if to_keep == 'before':

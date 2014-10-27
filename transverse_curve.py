@@ -140,6 +140,7 @@ class TransverseCurve(SageObject):
         fol = self._foliation
         adj_starting_side = self._sep[0].end_side() if self._direction == RIGHT \
                        else self._sep[1].end_side()
+        # self.save('tc.save')
         return new_foliation(self._get_separatrices(), self._sep[0].endpoint,
                              adj_starting_side,
                              is_one_sided = self.is_one_sided(),
@@ -164,6 +165,7 @@ def get_codings(foliation):
                                   1, 0, 1))
                                 
     return codings
+
 
 
 def other_tts(fol, depth):
